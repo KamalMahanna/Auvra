@@ -26,10 +26,12 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.mymusic.app.MainActivity
 import com.mymusic.app.R
+import com.mymusic.app.widget.MusicAppWidgetProvider
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -106,7 +108,7 @@ class MusicService : MediaLibraryService() {
             .setBitmapLoader(CoilBitmapLoader(this, scope))
             .build()
 
-        addSession(mediaSession!!)
+        mediaSession?.let { addSession(it) }
         Log.d(TAG, "MediaLibrarySession successfully built and registered")
 
         // Connect internal MediaController so Media3 automatically updates system notification controls
@@ -124,6 +126,20 @@ class MusicService : MediaLibraryService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        when (intent?.action) {
+            MusicAppWidgetProvider.ACTION_PLAY_PAUSE -> {
+                Log.d(TAG, "onStartCommand: ACTION_PLAY_PAUSE")
+                musicPlayerManager.togglePlayPause()
+            }
+            MusicAppWidgetProvider.ACTION_NEXT -> {
+                Log.d(TAG, "onStartCommand: ACTION_NEXT")
+                scope.launch { musicPlayerManager.playNext() }
+            }
+            MusicAppWidgetProvider.ACTION_PREVIOUS -> {
+                Log.d(TAG, "onStartCommand: ACTION_PREVIOUS")
+                musicPlayerManager.playPrevious()
+            }
+        }
         return START_STICKY
     }
 

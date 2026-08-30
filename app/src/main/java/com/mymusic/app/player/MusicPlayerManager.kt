@@ -17,6 +17,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.mymusic.app.data.model.Song
 import com.mymusic.app.data.repository.DownloadRepository
+import com.mymusic.app.widget.MusicAppWidgetProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +66,15 @@ class MusicPlayerManager @Inject constructor(
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
     init {
+        scope.launch {
+            playbackState.collect { state ->
+                try {
+                    MusicAppWidgetProvider.updateAllWidgets(context, state)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to update widgets on playback state change: ${e.message}", e)
+                }
+            }
+        }
         queueManager.onQueueAppended = { newSongs ->
             val player = exoPlayer
             if (player != null && newSongs.isNotEmpty()) {

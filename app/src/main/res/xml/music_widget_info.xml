@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/widget_mini_player"
+    android:minWidth="200dp"
+    android:minHeight="56dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:maxResizeWidth="500dp"
+    android:maxResizeHeight="120dp"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:previewLayout="@layout/widget_mini_player"
+    android:widgetCategory="home_screen" />
+

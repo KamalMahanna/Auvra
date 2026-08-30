@@ -43,6 +43,21 @@
             </intent-filter>
         </service>
 
+        <receiver
+            android:name=".widget.MusicAppWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.mymusic.app.ACTION_PLAY_PAUSE" />
+                <action android:name="com.mymusic.app.ACTION_NEXT" />
+                <action android:name="com.mymusic.app.ACTION_PREVIOUS" />
+                <action android:name="com.mymusic.app.ACTION_UPDATE_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/music_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>
