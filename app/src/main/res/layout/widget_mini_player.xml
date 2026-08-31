@@ -57,7 +57,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
-                android:layout_marginEnd="12dp"
+                android:layout_marginEnd="8dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -85,6 +85,18 @@
                     android:textColor="#9CA3AF"
                     android:textSize="12sp" />
             </LinearLayout>
+
+            <!-- Next Track Button (On the left side of Play/Pause) -->
+            <ImageButton
+                android:id="@+id/widget_btn_next"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/widget_control_button_bg"
+                android:contentDescription="Next"
+                android:padding="7dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_skip_next" />
 
             <!-- 48dp Circular Play/Pause Button -->
             <ImageButton

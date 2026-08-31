@@ -141,6 +141,18 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_art_container, launchPendingIntent)
             views.setOnClickPendingIntent(R.id.widget_text_container, launchPendingIntent)
 
+            // Setup Next Track PendingIntent
+            val nextIntent = Intent(context, MusicAppWidgetProvider::class.java).apply {
+                action = ACTION_NEXT
+            }
+            val nextPendingIntent = PendingIntent.getBroadcast(
+                context,
+                2,
+                nextIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_btn_next, nextPendingIntent)
+
             // Setup Play/Pause PendingIntent
             val playPauseIntent = Intent(context, MusicAppWidgetProvider::class.java).apply {
                 action = ACTION_PLAY_PAUSE
