@@ -1,92 +1,101 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background">
+    android:paddingStart="6dp"
+    android:paddingEnd="6dp">
 
-    <!-- Progress Background Tint Overlay -->
-    <ProgressBar
-        android:id="@+id/widget_progress"
-        style="@android:style/Widget.ProgressBar.Horizontal"
+    <!-- Pill Container (Vertically centered 64dp capsule matching MiniPlayer) -->
+    <FrameLayout
+        android:id="@+id/widget_root"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:indeterminate="false"
-        android:max="1000"
-        android:progress="0"
-        android:progressDrawable="@drawable/widget_progress_background" />
+        android:layout_height="64dp"
+        android:layout_gravity="center"
+        android:background="@drawable/widget_background">
 
-    <!-- Main Content Row -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp">
+        <!-- Full-Height Progress Tint Overlay -->
+        <ProgressBar
+            android:id="@+id/widget_progress"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:indeterminate="false"
+            android:max="1000"
+            android:progress="0"
+            android:progressDrawable="@drawable/widget_progress_background" />
 
-        <!-- 48dp Circular Album Artwork -->
-        <FrameLayout
-            android:id="@+id/widget_art_container"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/widget_artwork_placeholder">
-
-            <ImageView
-                android:id="@+id/widget_artwork"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="@string/app_name"
-                android:scaleType="centerCrop"
-                android:src="@drawable/ic_widget_music_note" />
-        </FrameLayout>
-
-        <!-- Song Title & Artist Column -->
+        <!-- Main Content Row -->
         <LinearLayout
-            android:id="@+id/widget_text_container"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="8dp">
 
-            <TextView
-                android:id="@+id/widget_title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:singleLine="true"
-                android:text="@string/app_name"
-                android:textColor="#F3F4F6"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+            <!-- 48dp Circular Album Artwork -->
+            <FrameLayout
+                android:id="@+id/widget_art_container"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/widget_artwork_placeholder">
 
-            <TextView
-                android:id="@+id/widget_artist"
-                android:layout_width="match_parent"
+                <ImageView
+                    android:id="@+id/widget_artwork"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@string/app_name"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_widget_music_note" />
+            </FrameLayout>
+
+            <!-- Song Title & Artist Column -->
+            <LinearLayout
+                android:id="@+id/widget_text_container"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:singleLine="true"
-                android:text="Tap to play"
-                android:textColor="#9CA3AF"
-                android:textSize="12sp" />
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:text="@string/app_name"
+                    android:textColor="#F3F4F6"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_artist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:text="Tap to play"
+                    android:textColor="#9CA3AF"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- 48dp Circular Play/Pause Button -->
+            <ImageButton
+                android:id="@+id/widget_btn_play_pause"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/widget_play_button_bg"
+                android:contentDescription="Play/Pause"
+                android:padding="11dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_play" />
         </LinearLayout>
-
-        <!-- 48dp Circular Play/Pause Button -->
-        <ImageButton
-            android:id="@+id/widget_btn_play_pause"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/widget_play_button_bg"
-            android:contentDescription="Play/Pause"
-            android:padding="11dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_play" />
-    </LinearLayout>
+    </FrameLayout>
 </FrameLayout>
