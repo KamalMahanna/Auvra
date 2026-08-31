@@ -138,7 +138,6 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widget_root, launchPendingIntent)
-            views.setOnClickPendingIntent(R.id.widget_art_container, launchPendingIntent)
             views.setOnClickPendingIntent(R.id.widget_text_container, launchPendingIntent)
 
             // Setup Next Track PendingIntent
@@ -178,13 +177,13 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(R.id.widget_artist, "Tap to play")
             }
 
-            // Update Play/Pause icon
+            // Update Play/Pause icon overlay
             val playPauseRes = if (playbackState.isPlaying) {
                 R.drawable.ic_widget_pause
             } else {
                 R.drawable.ic_widget_play
             }
-            views.setImageViewResource(R.id.widget_btn_play_pause, playPauseRes)
+            views.setImageViewResource(R.id.widget_play_pause_icon, playPauseRes)
 
             // Update Artwork
             if (artworkBitmap != null) {

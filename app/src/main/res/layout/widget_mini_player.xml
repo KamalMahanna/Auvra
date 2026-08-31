@@ -35,13 +35,15 @@
             android:paddingEnd="8dp"
             android:paddingBottom="8dp">
 
-            <!-- 48dp Circular Album Artwork -->
+            <!-- Play/Pause Button on Left with Artwork + Play/Pause Icon Overlay -->
             <FrameLayout
-                android:id="@+id/widget_art_container"
+                android:id="@+id/widget_btn_play_pause"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:background="@drawable/widget_artwork_placeholder">
+                android:background="@drawable/widget_artwork_placeholder"
+                android:clickable="true">
 
+                <!-- Artwork Image View -->
                 <ImageView
                     android:id="@+id/widget_artwork"
                     android:layout_width="match_parent"
@@ -49,15 +51,26 @@
                     android:contentDescription="@string/app_name"
                     android:scaleType="centerCrop"
                     android:src="@drawable/ic_widget_music_note" />
+
+                <!-- Play/Pause Icon & Contrast Overlay -->
+                <ImageView
+                    android:id="@+id/widget_play_pause_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/widget_art_overlay"
+                    android:contentDescription="Play/Pause"
+                    android:padding="11dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_widget_play" />
             </FrameLayout>
 
-            <!-- Song Title & Artist Column -->
+            <!-- Song Title & Artist Column (Middle) -->
             <LinearLayout
                 android:id="@+id/widget_text_container"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="12dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -86,28 +99,16 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
-            <!-- Next Track Button (On the left side of Play/Pause) -->
+            <!-- Next Track Button on Right Side -->
             <ImageButton
                 android:id="@+id/widget_btn_next"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginEnd="6dp"
-                android:background="@drawable/widget_control_button_bg"
-                android:contentDescription="Next"
-                android:padding="7dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_widget_skip_next" />
-
-            <!-- 48dp Circular Play/Pause Button -->
-            <ImageButton
-                android:id="@+id/widget_btn_play_pause"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="@drawable/widget_play_button_bg"
-                android:contentDescription="Play/Pause"
+                android:contentDescription="Next"
                 android:padding="11dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_widget_play" />
+                android:src="@drawable/ic_widget_skip_next" />
         </LinearLayout>
     </FrameLayout>
 </FrameLayout>
