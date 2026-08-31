@@ -99,12 +99,12 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
-            <!-- Next Track Button on Right Side -->
+            <!-- Next Track Button on Right Side (Transparent / No purple background or border) -->
             <ImageButton
                 android:id="@+id/widget_btn_next"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:background="@drawable/widget_play_button_bg"
+                android:background="@drawable/widget_control_button_bg"
                 android:contentDescription="Next"
                 android:padding="11dp"
                 android:scaleType="fitCenter"
