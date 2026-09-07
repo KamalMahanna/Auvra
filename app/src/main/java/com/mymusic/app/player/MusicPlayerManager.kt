@@ -316,7 +316,7 @@ class MusicPlayerManager @Inject constructor(
 
     fun playSongWithRecommendations(song: Song) {
         Log.d(TAG, "playSongWithRecommendations: songId='${song.id}', name='${song.name}'")
-        queueManager.setQueue(listOf(song), 0)
+        queueManager.setStreamingQueue(listOf(song), 0)
         syncQueueToPlayer(queueManager.queue.value, 0)
         scope.launch {
             try {

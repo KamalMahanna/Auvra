@@ -172,6 +172,52 @@ class QueueManager @Inject constructor(
         onQueueReset?.invoke(_queue.value, _currentIndex.value)
     }
 
+    /**
+     * Sets the queue in streaming mode, bypassing the downloaded-song detection.
+     * Used by [com.mymusic.app.player.MusicPlayerManager.playSongWithRecommendations] so that
+     * clicking a downloaded song outside the Library still fetches API recommendations instead
+     * of switching into downloaded-queue mode.
+     */
+    fun setStreamingQueue(songs: List<Song>, startIndex: Int = 0) {
+        isDownloadedQueueMode = false
+        fullDownloadedSourceList = emptyList()
+
+        Log.d(TAG, "setStreamingQueue: input size=${songs.size}, startIndex=$startIndex")
+        val originalTargetSong = if (startIndex in songs.indices) songs[startIndex] else null
+
+        val uniqueSongs = SongDeduplicator.deduplicate(songs)
+        Log.d(TAG, "setStreamingQueue: after deduplication, queue size=${uniqueSongs.size}")
+
+        originalQueue = uniqueSongs
+
+        val finalQueue = if (_isShuffleEnabled.value && originalTargetSong != null) {
+            val rest = uniqueSongs.toMutableList()
+            rest.remove(originalTargetSong)
+            rest.shuffle()
+            listOf(originalTargetSong) + rest
+        } else {
+            uniqueSongs
+        }
+
+        _queue.value = finalQueue
+        playedSongIds.clear()
+        playedKeys.clear()
+        finalQueue.forEach {
+            playedSongIds.add(it.id)
+            playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
+        }
+
+        val newIndex = if (originalTargetSong != null) {
+            finalQueue.indexOfFirst { it.id == originalTargetSong.id }
+        } else {
+            -1
+        }
+        _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, finalQueue.size - 1)
+        Log.d(TAG, "setStreamingQueue: new index=${_currentIndex.value}, song='${currentSong?.name}'")
+        saveState()
+        onQueueReset?.invoke(_queue.value, _currentIndex.value)
+    }
+
     fun setDownloadedQueue(songs: List<Song>, startIndex: Int = 0) {
         Log.d(TAG, "setDownloadedQueue: total downloaded songs=${songs.size}, startIndex=$startIndex, shuffle=${_isShuffleEnabled.value}")
         if (songs.isEmpty()) return
