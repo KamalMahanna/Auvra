@@ -16,10 +16,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.mymusic.app.data.repository.DownloadRepository
 import com.mymusic.app.player.MusicService
 import com.mymusic.app.player.QueueManager
 import com.mymusic.app.ui.navigation.MyMusicNavGraph
+import com.mymusic.app.ui.theme.DynamicThemeManager
 import com.mymusic.app.ui.theme.MyMusicTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +38,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var downloadRepository: DownloadRepository
+
+    @Inject
+    lateinit var dynamicThemeManager: DynamicThemeManager
 
     private val storagePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -78,7 +84,8 @@ class MainActivity : ComponentActivity() {
         requestStoragePermissionIfNeeded()
 
         setContent {
-            MyMusicTheme {
+            val dynamicPalette by dynamicThemeManager.dynamicPalette.collectAsState()
+            MyMusicTheme(dynamicPalette = dynamicPalette) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

@@ -60,7 +60,8 @@ fun SongListItem(
     )
 
     val glassBorderColor = Color.White.copy(alpha = 0.20f)
-    val glassBgColor = Color(0x35818CF8)
+    val glassBgColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+    val playingBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
 
     val baseModifier = modifier
         .fillMaxWidth()
@@ -74,7 +75,7 @@ fun SongListItem(
         baseModifier
             .clip(CircleShape)
             .background(glassBgColor)
-            .border(BorderStroke(1.dp, glassBorderColor), CircleShape)
+            .border(BorderStroke(1.dp, playingBorderColor), CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,

@@ -13,6 +13,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
+
+val LocalDynamicThemePalette = staticCompositionLocalOf { DefaultDynamicPalette }
+
 val GlassColorScheme = darkColorScheme(
     primary = GlassPrimary,
     onPrimary = Color.White,
@@ -32,10 +41,40 @@ val GlassColorScheme = darkColorScheme(
 
 @Composable
 fun MyMusicTheme(
+    dynamicPalette: DynamicColorPalette = DefaultDynamicPalette,
     darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = GlassColorScheme
+    val animatedPrimary by animateColorAsState(
+        targetValue = dynamicPalette.primary,
+        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        label = "AnimatedThemePrimary"
+    )
+    val animatedPrimaryContainer by animateColorAsState(
+        targetValue = dynamicPalette.primaryContainer,
+        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        label = "AnimatedThemePrimaryContainer"
+    )
+    val animatedSecondary by animateColorAsState(
+        targetValue = dynamicPalette.secondary,
+        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        label = "AnimatedThemeSecondary"
+    )
+    val animatedTertiary by animateColorAsState(
+        targetValue = dynamicPalette.tertiary,
+        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        label = "AnimatedThemeTertiary"
+    )
+
+    val colorScheme = GlassColorScheme.copy(
+        primary = animatedPrimary,
+        onPrimary = dynamicPalette.onPrimary,
+        primaryContainer = animatedPrimaryContainer,
+        onPrimaryContainer = dynamicPalette.onPrimaryContainer,
+        secondary = animatedSecondary,
+        tertiary = animatedTertiary
+    )
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -48,10 +87,12 @@ fun MyMusicTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        motionScheme = MotionScheme.expressive(),
-        content = content
-    )
+    CompositionLocalProvider(LocalDynamicThemePalette provides dynamicPalette) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            motionScheme = MotionScheme.expressive(),
+            content = content
+        )
+    }
 }

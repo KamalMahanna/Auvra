@@ -13,6 +13,7 @@ local.properties
 
 # Android Studio / IntelliJ IDEA
 .idea/
+.vscode/
 
 # External builds / Native
 .externalNativeBuild/

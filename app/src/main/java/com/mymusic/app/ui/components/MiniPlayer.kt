@@ -53,13 +53,15 @@ fun MiniPlayer(
     var totalDragY by remember { mutableFloatStateOf(0f) }
     val swipeThreshold = 80f
 
+    val miniBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+
     Box(
         modifier = modifier
             .width(240.dp)
             .padding(vertical = 8.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
-            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)), CircleShape)
+            .border(BorderStroke(1.dp, miniBorderColor), CircleShape)
             .clickable { onPlayerClick() }
             .pointerInput(Unit) {
                 detectDragGestures(

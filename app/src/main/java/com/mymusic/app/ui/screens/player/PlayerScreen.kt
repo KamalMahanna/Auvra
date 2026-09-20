@@ -971,7 +971,8 @@ private fun PlaybackControls(
 
     val glassBorderColor = Color.White.copy(alpha = 0.20f)
     val buttonGlassBg = Color.White.copy(alpha = 0.12f)
-    val playGlassBg = Color(0x55818CF8)
+    val playGlassBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+    val playBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -1021,7 +1022,7 @@ private fun PlaybackControls(
                 }
                 .clip(CircleShape)
                 .background(playGlassBg)
-                .border(BorderStroke(1.5.dp, glassBorderColor), CircleShape),
+                .border(BorderStroke(1.5.dp, playBorderColor), CircleShape),
             interactionSource = playInteractionSource
         ) {
             if (isBuffering) {

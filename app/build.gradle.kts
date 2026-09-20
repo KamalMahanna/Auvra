@@ -101,6 +101,7 @@ dependencies {
 
     implementation(libs.coroutines.android)
     implementation(libs.jaudiotagger)
+    implementation(libs.androidx.palette)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
