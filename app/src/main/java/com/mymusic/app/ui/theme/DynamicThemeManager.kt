@@ -100,7 +100,7 @@ class DynamicThemeManager @Inject constructor(
                     val result = context.imageLoader.execute(request)
                     if (result is SuccessResult) {
                         val bitmap = result.image.toBitmap()
-                        val extracted = extractDynamicPalette(bitmap)
+                        val extracted = ArtworkColorExtractor.extractDynamicPalette(bitmap)
                         paletteCache.put(cacheKey, extracted)
                         _dynamicPalette.value = extracted
                         return@launch
@@ -115,7 +115,49 @@ class DynamicThemeManager @Inject constructor(
         }
     }
 
-    private fun extractDynamicPalette(bitmap: Bitmap): DynamicColorPalette {
+    companion object {
+        private const val TAG = "DynamicThemeManager"
+    }
+}
+
+object ArtworkColorExtractor {
+    val DEFAULT_ACCENT_COLOR = GlassPrimary.toArgb()
+
+    fun extractAccentColor(bitmap: Bitmap): Int {
+        return try {
+            val palette = Palette.from(bitmap)
+                .maximumColorCount(24)
+                .clearFilters()
+                .generate()
+
+            val primaryInt = palette.vibrantSwatch?.rgb
+                ?: palette.lightVibrantSwatch?.rgb
+                ?: palette.dominantSwatch?.rgb
+                ?: palette.mutedSwatch?.rgb
+                ?: DEFAULT_ACCENT_COLOR
+
+            tuneColorForDarkTheme(primaryInt)
+        } catch (e: Exception) {
+            DEFAULT_ACCENT_COLOR
+        }
+    }
+
+    fun tuneColorForDarkTheme(colorInt: Int): Int {
+        val hsl = FloatArray(3)
+        ColorUtils.colorToHSL(colorInt, hsl)
+
+        // Boost saturation slightly if it's too washed out
+        if (hsl[1] < 0.40f && hsl[1] > 0.05f) {
+            hsl[1] = 0.55f
+        }
+
+        // Clamp lightness in the ideal range for dark mode UI
+        hsl[2] = hsl[2].coerceIn(0.55f, 0.78f)
+
+        return ColorUtils.HSLToColor(hsl)
+    }
+
+    fun extractDynamicPalette(bitmap: Bitmap): DynamicColorPalette {
         return try {
             val palette = Palette.from(bitmap)
                 .maximumColorCount(24)
@@ -127,7 +169,7 @@ class DynamicThemeManager @Inject constructor(
                 ?: palette.lightVibrantSwatch?.rgb
                 ?: palette.dominantSwatch?.rgb
                 ?: palette.mutedSwatch?.rgb
-                ?: GlassPrimary.toArgb()
+                ?: DEFAULT_ACCENT_COLOR
 
             val adjustedPrimary = tuneColorForDarkTheme(primaryInt)
             val primaryCompose = Color(adjustedPrimary)
@@ -178,33 +220,8 @@ class DynamicThemeManager @Inject constructor(
                 onTertiary = Color.White
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Error generating palette: ${e.message}", e)
             DefaultDynamicPalette
         }
-    }
-
-    /**
-     * Calibrates hue, saturation, and lightness to ensure accent colors pop
-     * vibrantly on dark glass surfaces (#0D0E15 / #161824) without being dull,
-     * washed out, or blindingly white.
-     */
-    private fun tuneColorForDarkTheme(colorInt: Int): Int {
-        val hsl = FloatArray(3)
-        ColorUtils.colorToHSL(colorInt, hsl)
-
-        // Boost saturation slightly if it's too washed out
-        if (hsl[1] < 0.40f && hsl[1] > 0.05f) {
-            hsl[1] = 0.55f
-        }
-
-        // Clamp lightness in the ideal range for dark mode UI
-        hsl[2] = hsl[2].coerceIn(0.55f, 0.78f)
-
-        return ColorUtils.HSLToColor(hsl)
-    }
-
-    companion object {
-        private const val TAG = "DynamicThemeManager"
     }
 }
 

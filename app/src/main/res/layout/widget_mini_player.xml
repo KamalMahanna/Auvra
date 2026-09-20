@@ -13,6 +13,13 @@
         android:layout_gravity="center"
         android:background="@drawable/widget_background">
 
+        <!-- Subtle Ambient Color Tint Overlay -->
+        <FrameLayout
+            android:id="@+id/widget_ambient_tint"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/widget_ambient_background" />
+
         <!-- Full-Height Progress Tint Overlay -->
         <ProgressBar
             android:id="@+id/widget_progress"
