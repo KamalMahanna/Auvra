@@ -73,6 +73,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 
+import androidx.compose.foundation.layout.statusBarsPadding
+import com.mymusic.app.ui.components.OfflineBanner
+
 sealed class Screen(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Home : Screen("home", "Home", Icons.Rounded.Home)
     object Search : Screen("search", "Search", Icons.Rounded.Search)
@@ -92,6 +95,7 @@ fun MyMusicNavGraph(
     val navController = rememberNavController()
     var isPlayerExpanded by remember { mutableStateOf(false) }
 
+    val isOnline by playerViewModel.isOnline.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isMiniPlayerVisible = currentSong != null && !isPlayerExpanded
 
@@ -247,6 +251,15 @@ fun MyMusicNavGraph(
                 onCollapse = { isPlayerExpanded = false }
             )
         }
+
+        // Floating Offline Status Banner (at the top, over all screens and sheets)
+        OfflineBanner(
+            isOnline = isOnline,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 8.dp)
+        )
     }
 }
 

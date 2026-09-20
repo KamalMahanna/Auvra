@@ -17,6 +17,10 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.mymusic.app.data.model.Song
 import com.mymusic.app.data.repository.DownloadRepository
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import com.mymusic.app.utils.NetworkMonitor
 import com.mymusic.app.widget.MusicAppWidgetProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -41,7 +45,8 @@ class MusicPlayerManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queueManager: QueueManager,
     private val downloadRepository: DownloadRepository,
-    private val streamingCacheManager: StreamingCacheManager
+    private val streamingCacheManager: StreamingCacheManager,
+    private val networkMonitor: NetworkMonitor
 ) {
     private var exoPlayer: ExoPlayer? = null
     private var forwardingPlayer: Player? = null
@@ -208,6 +213,27 @@ class MusicPlayerManager @Inject constructor(
 
                     override fun onPlayerError(error: PlaybackException) {
                         Log.w(TAG, "ExoPlayer error (${error.errorCode}): ${error.message}", error)
+                        val isNetworkErr = !networkMonitor.isOnlineNow() ||
+                            error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+                            error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
+                            error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
+                            NetworkMonitor.isNetworkError(error)
+
+                        if (isNetworkErr) {
+                            Handler(Looper.getMainLooper()).post {
+                                Toast.makeText(
+                                    context,
+                                    "No internet connection. Connect to stream music or play downloaded songs.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                            _playbackState.value = _playbackState.value.copy(
+                                isPlaying = false,
+                                isBuffering = false
+                            )
+                            return
+                        }
+
                         if (exo.hasNextMediaItem()) {
                             Log.d(TAG, "Auto-skipping to next media item due to error")
                             exo.seekToNextMediaItem()

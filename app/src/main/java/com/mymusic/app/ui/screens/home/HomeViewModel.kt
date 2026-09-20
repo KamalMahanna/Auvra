@@ -12,6 +12,7 @@ import com.mymusic.app.data.model.Song
 import com.mymusic.app.data.repository.MusicRepository
 import com.mymusic.app.player.MusicPlayerManager
 import com.mymusic.app.utils.SongDeduplicator
+import com.mymusic.app.utils.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,8 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val musicRepository: MusicRepository,
-    private val musicPlayerManager: MusicPlayerManager
+    private val musicPlayerManager: MusicPlayerManager,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -39,6 +41,14 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadModules()
+    }
+
+    fun retry() {
+        loadModules()
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
     }
 
     private fun loadModules() {
@@ -61,17 +71,34 @@ class HomeViewModel @Inject constructor(
                 )
             }.onFailure { e ->
                 if (_uiState.value.sections.isEmpty()) {
+                    val errorMsg = if (!networkMonitor.isOnlineNow() || NetworkMonitor.isNetworkError(e)) {
+                        "No internet connection"
+                    } else {
+                        e.message ?: "Failed to load music"
+                    }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = e.message
+                        error = errorMsg
                     )
                 }
             }
         }
     }
 
+    private fun sanitizeError(e: Throwable, fallback: String): String {
+        return if (!networkMonitor.isOnlineNow() || NetworkMonitor.isNetworkError(e)) {
+            "No internet connection. Connect to stream music."
+        } else {
+            e.message ?: fallback
+        }
+    }
+
     fun playModuleItem(item: ModuleItem) {
         Log.d(TAG, "playModuleItem: id='${item.id}', type='${item.type}', name='${item.name}'")
+        if (!networkMonitor.isOnlineNow()) {
+            _uiState.value = _uiState.value.copy(error = "No internet connection. Connect to stream music.")
+            return
+        }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(error = null)
             try {
@@ -89,7 +116,7 @@ class HomeViewModel @Inject constructor(
                             musicPlayerManager.playSongWithRecommendations(song)
                         }.onFailure { e ->
                             Log.e(TAG, "Failed to load song", e)
-                            _uiState.value = _uiState.value.copy(error = "Failed to load song: ${e.message}")
+                            _uiState.value = _uiState.value.copy(error = sanitizeError(e, "Failed to load song"))
                             musicPlayerManager.clearLoadingState(item.id)
                         }
                     }
@@ -115,7 +142,7 @@ class HomeViewModel @Inject constructor(
                             if (current != null && current.id == item.id && current.songs == null) {
                                 _uiState.value = _uiState.value.copy(
                                     selectedPlaylist = null,
-                                    error = "Failed to load playlist: ${e.message}"
+                                    error = sanitizeError(e, "Failed to load playlist")
                                 )
                             }
                         }
@@ -142,7 +169,7 @@ class HomeViewModel @Inject constructor(
                             if (current != null && current.id == item.id && current.songs == null) {
                                 _uiState.value = _uiState.value.copy(
                                     selectedAlbum = null,
-                                    error = "Failed to load album: ${e.message}"
+                                    error = sanitizeError(e, "Failed to load album")
                                 )
                             }
                         }
@@ -171,7 +198,7 @@ class HomeViewModel @Inject constructor(
                             if (current != null && current.id == item.id && current.topSongs == null) {
                                 _uiState.value = _uiState.value.copy(
                                     selectedArtistDetail = null,
-                                    error = "Failed to load artist: ${e.message}"
+                                    error = sanitizeError(e, "Failed to load artist")
                                 )
                             }
                         }

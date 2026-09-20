@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mymusic.app.data.model.*
 import com.mymusic.app.data.repository.MusicRepository
+import com.mymusic.app.utils.NetworkMonitor
 import com.mymusic.app.utils.SongDeduplicator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -33,13 +34,30 @@ data class SearchUiState(
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val musicRepository: MusicRepository
+    private val musicRepository: MusicRepository,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+
+    fun retry() {
+        performSearch(_uiState.value.query)
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    private fun sanitizeError(e: Throwable, fallback: String): String {
+        return if (!networkMonitor.isOnlineNow() || NetworkMonitor.isNetworkError(e)) {
+            "No internet connection"
+        } else {
+            e.message ?: fallback
+        }
+    }
 
     fun onQueryChange(query: String) {
         _uiState.value = _uiState.value.copy(query = query)
@@ -61,6 +79,13 @@ class SearchViewModel @Inject constructor(
 
         searchJob = viewModelScope.launch {
             delay(500) // debounce
+            if (!networkMonitor.isOnlineNow()) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "No internet connection"
+                )
+                return@launch
+            }
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             val songsDeferred = async { musicRepository.searchSongs(query) }
@@ -100,11 +125,20 @@ class SearchViewModel @Inject constructor(
                     playlists = cleanPlaylists
                 )
             } else {
-                val errorMsg = songsResult.exceptionOrNull()?.message
-                    ?: albumsResult.exceptionOrNull()?.message
-                    ?: artistsResult.exceptionOrNull()?.message
-                    ?: playlistsResult.exceptionOrNull()?.message
-                    ?: "Search failed"
+                val anyNetworkErr = !networkMonitor.isOnlineNow() ||
+                    listOf(songsResult, albumsResult, artistsResult, playlistsResult)
+                        .mapNotNull { it.exceptionOrNull() }
+                        .any { NetworkMonitor.isNetworkError(it) }
+
+                val errorMsg = if (anyNetworkErr) {
+                    "No internet connection"
+                } else {
+                    songsResult.exceptionOrNull()?.message
+                        ?: albumsResult.exceptionOrNull()?.message
+                        ?: artistsResult.exceptionOrNull()?.message
+                        ?: playlistsResult.exceptionOrNull()?.message
+                        ?: "Search failed"
+                }
                 _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
             }
         }
@@ -133,7 +167,7 @@ class SearchViewModel @Inject constructor(
                     if (_uiState.value.selectedArtistDetail == null) {
                         _uiState.value = _uiState.value.copy(
                             isArtistDetailLoading = false,
-                            error = e.message
+                            error = sanitizeError(e, "Failed to load artist")
                         )
                     }
                 }
@@ -163,7 +197,7 @@ class SearchViewModel @Inject constructor(
                     if (_uiState.value.selectedPlaylist == null) {
                         _uiState.value = _uiState.value.copy(
                             isPlaylistDetailLoading = false,
-                            error = e.message
+                            error = sanitizeError(e, "Failed to load playlist")
                         )
                     }
                 }
@@ -193,7 +227,7 @@ class SearchViewModel @Inject constructor(
                     if (_uiState.value.selectedAlbum == null) {
                         _uiState.value = _uiState.value.copy(
                             isAlbumDetailLoading = false,
-                            error = e.message
+                            error = sanitizeError(e, "Failed to load album")
                         )
                     }
                 }

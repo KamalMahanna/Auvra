@@ -7,6 +7,7 @@ import com.mymusic.app.data.repository.DownloadRepository
 import com.mymusic.app.download.SongDownloader
 import com.mymusic.app.player.MusicPlayerManager
 import com.mymusic.app.player.QueueManager
+import com.mymusic.app.utils.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,9 +22,11 @@ class PlayerViewModel @Inject constructor(
     private val musicPlayerManager: MusicPlayerManager,
     private val songDownloader: SongDownloader,
     private val downloadRepository: DownloadRepository,
-    private val queueManager: QueueManager
+    private val queueManager: QueueManager,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
+    val isOnline = networkMonitor.isOnline
     val playbackState = musicPlayerManager.playbackState
     val downloadStates = songDownloader.downloadStates
     val queue = queueManager.queue

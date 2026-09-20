@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -47,10 +48,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.mymusic.app.ui.components.OfflineEmptyState
 import com.mymusic.app.ui.components.SongListItem
 import com.mymusic.app.ui.screens.player.PlayerViewModel
 
@@ -63,9 +67,18 @@ fun HomeScreen(
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
     val cardSize = if (isTablet) 160.dp else 120.dp
+
+    LaunchedEffect(uiState.error) {
+        val err = uiState.error
+        if (err != null && uiState.sections.isNotEmpty()) {
+            Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+            viewModel.clearError()
+        }
+    }
 
     // Hoist sheet states so they survive recompositions and avoid animation jank on open
     val playlistSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -78,9 +91,16 @@ fun HomeScreen(
                 CircularWavyProgressIndicator()
             }
         } else if (uiState.error != null && uiState.sections.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Error: ${uiState.error}")
-            }
+            val isNetworkErr = uiState.error?.contains("internet", ignoreCase = true) == true
+            OfflineEmptyState(
+                title = if (isNetworkErr) "No internet connection" else "Failed to load music",
+                description = if (isNetworkErr) {
+                    "Connect to Wi-Fi or mobile data to explore and stream music, or listen to your downloaded songs."
+                } else {
+                    uiState.error ?: "An unexpected error occurred. Please try again."
+                },
+                onRetry = { viewModel.retry() }
+            )
         } else {
             val listState = rememberLazyListState()
             LazyColumn(

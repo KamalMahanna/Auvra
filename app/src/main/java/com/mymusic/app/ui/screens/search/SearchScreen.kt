@@ -43,6 +43,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.ui.text.style.TextOverflow
+import com.mymusic.app.ui.components.OfflineEmptyState
 
 import com.mymusic.app.ui.components.SongListItem
 import com.mymusic.app.ui.screens.player.PlayerViewModel
@@ -191,9 +192,16 @@ fun SearchScreen(
                 CircularWavyProgressIndicator()
             }
         } else if (uiState.error != null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Error: ${uiState.error}")
-            }
+            val isNetworkErr = uiState.error?.contains("internet", ignoreCase = true) == true
+            OfflineEmptyState(
+                title = if (isNetworkErr) "No internet connection" else "Search failed",
+                description = if (isNetworkErr) {
+                    "Connect to Wi-Fi or mobile data to search songs, albums, artists, and playlists."
+                } else {
+                    uiState.error ?: "Unable to complete search. Please try again."
+                },
+                onRetry = { viewModel.retry() }
+            )
         } else {
             key(selectedCategory) {
                 LazyVerticalGrid(
