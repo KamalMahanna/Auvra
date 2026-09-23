@@ -88,7 +88,7 @@ fun UpdateDialog(
 
                 // Version and Size Badges
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // New Version Badge
@@ -102,20 +102,9 @@ fun UpdateDialog(
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-
-                    // Current Version Badge
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                    ) {
-                        Text(
-                            text = "Installed: v$currentVersion",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
 
@@ -123,20 +112,36 @@ fun UpdateDialog(
                     if (release.formattedApkSize.isNotBlank()) {
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
                         ) {
                             Text(
                                 text = release.formattedApkSize,
                                 style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
                 }
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Current Installed Version Subtitle
+                Text(
+                    text = "Installed: v$currentVersion",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    softWrap = false
+                )
+
                 // Release notes / Changelog card
-                if (release.releaseNotes.isNotBlank()) {
+                val cleanedNotes = release.cleanReleaseNotes()
+                if (cleanedNotes.isNotBlank()) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Surface(
@@ -160,7 +165,7 @@ fun UpdateDialog(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = release.releaseNotes.trim(),
+                                text = cleanedNotes,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = MaterialTheme.typography.bodySmall.lineHeight

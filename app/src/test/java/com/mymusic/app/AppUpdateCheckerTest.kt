@@ -35,5 +35,55 @@ class AppUpdateCheckerTest {
         assertFalse(AppUpdateChecker.isUpdateAvailable("26.07.10.21", "26.07.10.21"))
         assertFalse(AppUpdateChecker.isUpdateAvailable("26.07.10.22", "26.07.10.21"))
     }
+
+    @Test
+    fun testCleanReleaseNotesFiltersBoilerplate() {
+        val boilerplate = """
+            Automated release generated on push to main branch.
+            
+            **Version Name:** `26.09.23.62`
+            **Version Code:** `62`
+        """.trimIndent()
+
+        val release = com.mymusic.app.data.model.AppRelease(
+            tagName = "v26.09.23.62",
+            versionName = "26.09.23.62",
+            releaseNotes = boilerplate,
+            downloadUrl = "https://example.com",
+            publishedAt = "2026-09-23",
+            apkSize = 3812580L
+        )
+
+        assertEquals("• Performance improvements and bug fixes.", release.cleanReleaseNotes())
+    }
+
+    @Test
+    fun testCleanReleaseNotesFormatsMarkdownAndBullets() {
+        val markdownNotes = """
+            ### What's Changed
+            • Add Material 3 progress bar below downloads header during update/sync
+            - Eliminate audio artifact and residual sound on song transitions
+            * **Important**: `Fix playback resumption`
+            
+            **Full Changelog**: https://github.com/example/repo
+        """.trimIndent()
+
+        val release = com.mymusic.app.data.model.AppRelease(
+            tagName = "v26.09.23.63",
+            versionName = "26.09.23.63",
+            releaseNotes = markdownNotes,
+            downloadUrl = "https://example.com",
+            publishedAt = "2026-09-23",
+            apkSize = 3812580L
+        )
+
+        val expected = """
+            • Add Material 3 progress bar below downloads header during update/sync
+            • Eliminate audio artifact and residual sound on song transitions
+            • Important: Fix playback resumption
+        """.trimIndent()
+
+        assertEquals(expected, release.cleanReleaseNotes())
+    }
 }
 
