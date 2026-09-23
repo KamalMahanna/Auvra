@@ -13,19 +13,19 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <application
-        android:name=".MyMusicApp"
+        android:name=".AuvraApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MyMusic"
+        android:theme="@style/Theme.Auvra"
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.MyMusic">
+            android:theme="@style/Theme.Auvra">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -49,10 +49,10 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.mymusic.app.ACTION_PLAY_PAUSE" />
-                <action android:name="com.mymusic.app.ACTION_NEXT" />
-                <action android:name="com.mymusic.app.ACTION_PREVIOUS" />
-                <action android:name="com.mymusic.app.ACTION_UPDATE_WIDGET" />
+                <action android:name="com.auvra.app.ACTION_PLAY_PAUSE" />
+                <action android:name="com.auvra.app.ACTION_NEXT" />
+                <action android:name="com.auvra.app.ACTION_PREVIOUS" />
+                <action android:name="com.auvra.app.ACTION_UPDATE_WIDGET" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

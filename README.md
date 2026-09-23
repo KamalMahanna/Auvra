@@ -1,10 +1,10 @@
-# MyMusic
+# Auvra
 
 <p align="center">
-  <img src="logo.png" alt="MyMusic Logo" width="180" style="border-radius: 20%;"/>
+  <img src="logo.png" alt="Auvra Logo" width="180" style="border-radius: 20%;"/>
 </p>
 
-**MyMusic** is a high-fidelity, feature-rich music streaming and downloading application for Android. Built with a modern Android tech stack, the app integrates with an online music API to deliver seamless streaming, background audio playback with lock-screen control, high-speed offline downloads, and an adaptive Material 3 Jetpack Compose interface.
+**Auvra** is a high-fidelity, feature-rich music streaming and downloading application for Android. Built with a modern Android tech stack, the app integrates with an online music API to deliver seamless streaming, background audio playback with lock-screen control, high-speed offline downloads, and an adaptive Material 3 Jetpack Compose interface.
 
 ---
 
@@ -12,26 +12,26 @@
 
 You can download the latest pre-compiled stable APK directly from the **GitHub Releases** section:
 
-* 🚀 **[Download Latest APK](https://github.com/KamalMahanna/MyMusic/releases/latest)** (Includes the latest stable features)
-* 📦 **[View All Releases](https://github.com/KamalMahanna/MyMusic/releases)** (For access to historical builds and changelogs)
+* 🚀 **[Download Latest APK](https://github.com/KamalMahanna/Auvra/releases/latest)** (Includes the latest stable features)
+* 📦 **[View All Releases](https://github.com/KamalMahanna/Auvra/releases)** (For access to historical builds and changelogs)
 
 ---
 
 ## 🚀 Key Features
 
-* **🎵 High-Quality Online Streaming:** Discover and stream millions of tracks, albums, playlists, and artists in high resolution via integrated [API client](app/src/main/java/com/mymusic/app/data/api/SaavnApi.kt).
-* **📻 System-Integrated Playback:** A foreground audio service built on **AndroidX Media3 (ExoPlayer & MediaSession)**, supporting lock screen media controls, background playback, system notification integration, and audio focus handling. Implemented in [MusicService](app/src/main/java/com/mymusic/app/player/MusicService.kt) and [MusicPlayerManager](app/src/main/java/com/mymusic/app/player/MusicPlayerManager.kt).
-* **📥 Offline Downloads:** High-speed song downloader ([SongDownloader](app/src/main/java/com/mymusic/app/download/SongDownloader.kt)) that saves files directly to the public `Music/MyMusic` directory, allowing other players to index downloaded music and supporting local playback via [DownloadRepository](app/src/main/java/com/mymusic/app/data/repository/DownloadRepository.kt).
-* **🔀 Smart Queue & Playback Management:** Queue persistence, shuffle, repeat-one, repeat-all, and smooth seek features, managed efficiently via [QueueManager](app/src/main/java/com/mymusic/app/player/QueueManager.kt).
-* **⚡ Smart Offline Cache:** Reduces network consumption for streaming by utilizing custom network caching policies on OkHttp, along with a dedicated [StreamingCacheManager](app/src/main/java/com/mymusic/app/player/StreamingCacheManager.kt).
+* **🎵 High-Quality Online Streaming:** Discover and stream millions of tracks, albums, playlists, and artists in high resolution via integrated [API client](app/src/main/java/com/auvra/app/data/api/SaavnApi.kt).
+* **📻 System-Integrated Playback:** A foreground audio service built on **AndroidX Media3 (ExoPlayer & MediaSession)**, supporting lock screen media controls, background playback, system notification integration, and audio focus handling. Implemented in [MusicService](app/src/main/java/com/auvra/app/player/MusicService.kt) and [MusicPlayerManager](app/src/main/java/com/auvra/app/player/MusicPlayerManager.kt).
+* **📥 Offline Downloads:** High-speed song downloader ([SongDownloader](app/src/main/java/com/auvra/app/download/SongDownloader.kt)) that saves files directly to the public `Music/Auvra` directory, allowing other players to index downloaded music and supporting local playback via [DownloadRepository](app/src/main/java/com/auvra/app/data/repository/DownloadRepository.kt).
+* **🔀 Smart Queue & Playback Management:** Queue persistence, shuffle, repeat-one, repeat-all, and smooth seek features, managed efficiently via [QueueManager](app/src/main/java/com/auvra/app/player/QueueManager.kt).
+* **⚡ Smart Offline Cache:** Reduces network consumption for streaming by utilizing custom network caching policies on OkHttp, along with a dedicated [StreamingCacheManager](app/src/main/java/com/auvra/app/player/StreamingCacheManager.kt).
 * **🎨 Responsive Jetpack Compose UI:** Premium design with glassmorphism, dynamic animations, modern color schemes, and seamless layout transitions.
-* **📱 Adaptive Layouts:** Adapts to multiple screen form factors: uses a bottom navigation bar on phones and an elegant navigation rail on tablets or foldables ([NavGraph.kt](app/src/main/java/com/mymusic/app/ui/navigation/NavGraph.kt)).
+* **📱 Adaptive Layouts:** Adapts to multiple screen form factors: uses a bottom navigation bar on phones and an elegant navigation rail on tablets or foldables ([NavGraph.kt](app/src/main/java/com/auvra/app/ui/navigation/NavGraph.kt)).
 
 ---
 
 ## 🛠️ Architecture & Tech Stack
 
-MyMusic adheres to modern Android architecture principles (**Clean Architecture** & **MVI/MVVM UI state patterns**).
+Auvra adheres to modern Android architecture principles (**Clean Architecture** & **MVI/MVVM UI state patterns**).
 
 ```mermaid
 graph TD
@@ -48,8 +48,8 @@ graph TD
 * **Minimum SDK:** 24 (Android 7.0)
 * **Target/Compile SDK:** 35 (Android 15)
 * **Language:** Kotlin (JVM Target 17)
-* **Dependency Injection:** Dagger Hilt (`@HiltAndroidApp` in [MyMusicApp](app/src/main/java/com/mymusic/app/MyMusicApp.kt))
-* **Network:** Retrofit + OkHttp with aggressive caching rules in [AppModule](app/src/main/java/com/mymusic/app/di/AppModule.kt).
+* **Dependency Injection:** Dagger Hilt (`@HiltAndroidApp` in [AuvraApp](app/src/main/java/com/auvra/app/AuvraApp.kt))
+* **Network:** Retrofit + OkHttp with aggressive caching rules in [AppModule](app/src/main/java/com/auvra/app/di/AppModule.kt).
 * **JSON Parsing:** Moshi + Moshi Kotlin Codegen.
 * **Image Loading:** Coil 3 featuring OkHttp integration and a robust 1GB local disk cache.
 * **Audio Engine:** AndroidX Media3 (ExoPlayer, MediaSession, MediaLibraryService).
@@ -59,11 +59,11 @@ graph TD
 ## 📂 Project Structure Guide
 
 ```
-MyMusic/
+Auvra/
 ├── app/
-│   └── src/main/java/com/mymusic/app/
-│       ├── MainActivity.kt        # Entry point activity initializing MyMusicTheme
-│       ├── MyMusicApp.kt       # Application class setting up Coil 3 and Dagger Hilt
+│   └── src/main/java/com/auvra/app/
+│       ├── MainActivity.kt        # Entry point activity initializing AuvraTheme
+│       ├── AuvraApp.kt            # Application class setting up Coil 3 and Dagger Hilt
 │       ├── data/                  # Data layer (APIs, repositories, and models)
 │       │   ├── api/               # API clients and data models
 │       │   ├── model/             # Models for Songs, Artists, Playlists

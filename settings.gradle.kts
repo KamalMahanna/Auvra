@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MyMusic"
+rootProject.name = "Auvra"
 include(":app")

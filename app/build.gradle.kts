@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.mymusic.app"
+    namespace = "com.auvra.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.mymusic.app"
+        applicationId = "com.auvra.app"
         minSdk = 24
         targetSdk = 35
         

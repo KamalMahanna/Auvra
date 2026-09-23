@@ -53,13 +53,13 @@ jobs:
 
     - name: Prepare APK for Release
       run: |
-        cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/MyMusic-${{ steps.version.outputs.version_name }}.apk
+        cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Auvra-${{ steps.version.outputs.version_name }}.apk
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: MyMusic-${{ steps.version.outputs.version_name }}
-        path: app/build/outputs/apk/release/MyMusic-${{ steps.version.outputs.version_name }}.apk
+        name: Auvra-${{ steps.version.outputs.version_name }}
+        path: app/build/outputs/apk/release/Auvra-${{ steps.version.outputs.version_name }}.apk
 
     - name: Generate Release Notes
       id: release_notes
@@ -74,7 +74,7 @@ jobs:
         tag_name: ${{ steps.version.outputs.tag_name }}
         name: Release ${{ steps.version.outputs.version_name }}
         body_path: release_notes.md
-        files: app/build/outputs/apk/release/MyMusic-${{ steps.version.outputs.version_name }}.apk
+        files: app/build/outputs/apk/release/Auvra-${{ steps.version.outputs.version_name }}.apk
         draft: false
         prerelease: false
       env:
