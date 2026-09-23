@@ -2,6 +2,7 @@ package com.auvra.app.player
 
 import android.content.Context
 import android.util.Log
+import androidx.core.content.edit
 import com.auvra.app.data.model.Song
 import com.auvra.app.data.repository.DownloadRepository
 import com.auvra.app.data.repository.MusicRepository
@@ -76,12 +77,12 @@ class QueueManager @Inject constructor(
                 val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Song::class.java)
                 val json = moshi.adapter<List<Song>>(listType).toJson(_queue.value)
                 val originalJson = moshi.adapter<List<Song>>(listType).toJson(originalQueue)
-                sharedPreferences.edit()
-                    .putString("KEY_QUEUE", json)
-                    .putInt("KEY_CURRENT_INDEX", _currentIndex.value)
-                    .putBoolean("KEY_SHUFFLE_ENABLED", _isShuffleEnabled.value)
-                    .putString("KEY_ORIGINAL_QUEUE", originalJson)
-                    .apply()
+                sharedPreferences.edit {
+                    putString("KEY_QUEUE", json)
+                    putInt("KEY_CURRENT_INDEX", _currentIndex.value)
+                    putBoolean("KEY_SHUFFLE_ENABLED", _isShuffleEnabled.value)
+                    putString("KEY_ORIGINAL_QUEUE", originalJson)
+                }
                 Log.d(TAG, "saveState success: queue size=${_queue.value.size}, index=${_currentIndex.value}, shuffle=${_isShuffleEnabled.value}")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save queue state", e)

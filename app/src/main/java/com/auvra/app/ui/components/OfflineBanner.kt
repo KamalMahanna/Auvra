@@ -107,11 +107,11 @@ fun OfflineBanner(
 
 @Composable
 fun OfflineEmptyState(
+    modifier: Modifier = Modifier,
     title: String = "No internet connection",
     description: String = "Connect to Wi-Fi or mobile data to explore and stream music, or listen to your downloaded songs.",
     onRetry: (() -> Unit)? = null,
-    onGoToLibrary: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    onGoToLibrary: (() -> Unit)? = null
 ) {
     Column(
         modifier = modifier

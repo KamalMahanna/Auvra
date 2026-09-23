@@ -2,6 +2,7 @@ package com.auvra.app.utils
 
 import android.content.Context
 import android.content.pm.PackageManager
+import androidx.core.content.edit
 import android.os.Build
 import android.util.Log
 import com.auvra.app.data.model.AppRelease
@@ -141,7 +142,7 @@ class AppUpdateChecker @Inject constructor(
      * Records that the user dismissed this release tag so they are not prompted again for it.
      */
     fun dismissRelease(tagName: String) {
-        prefs.edit().putString(KEY_DISMISSED_TAG, tagName).apply()
+        prefs.edit { putString(KEY_DISMISSED_TAG, tagName) }
     }
 
     companion object {

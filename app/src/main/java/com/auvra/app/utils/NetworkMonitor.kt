@@ -4,8 +4,6 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
-import android.os.Build
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,14 +47,7 @@ class NetworkMonitor @Inject constructor(
 
     init {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                connectivityManager?.registerDefaultNetworkCallback(networkCallback)
-            } else {
-                val request = NetworkRequest.Builder()
-                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    .build()
-                connectivityManager?.registerNetworkCallback(request, networkCallback)
-            }
+            connectivityManager?.registerDefaultNetworkCallback(networkCallback)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to register network callback: ${e.message}", e)
         }

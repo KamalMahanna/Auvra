@@ -7,6 +7,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -172,8 +173,9 @@ class MusicPlayerManager @Inject constructor(
 
                             // Reset saved position for the new song
                             try {
-                                getPlaybackPreferences(context)
-                                    .edit().putLong("KEY_SEEK_POSITION", 0L).apply()
+                                getPlaybackPreferences(context).edit {
+                                    putLong("KEY_SEEK_POSITION", 0L)
+                                }
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed to reset seek position", e)
                             }
@@ -436,8 +438,9 @@ class MusicPlayerManager @Inject constructor(
 
         // Reset saved position so the new song always starts from the beginning (or seekPosition).
         try {
-            getPlaybackPreferences(context)
-                .edit().putLong("KEY_SEEK_POSITION", seekPosition).apply()
+            getPlaybackPreferences(context).edit {
+                putLong("KEY_SEEK_POSITION", seekPosition)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to reset seek position", e)
         }
@@ -563,10 +566,9 @@ class MusicPlayerManager @Inject constructor(
         exoPlayer?.seekTo(position)
         _playbackState.value = _playbackState.value.copy(currentPosition = position)
         try {
-            val sharedPreferences = getPlaybackPreferences(context)
-            sharedPreferences.edit()
-                .putLong("KEY_SEEK_POSITION", position)
-                .apply()
+            getPlaybackPreferences(context).edit {
+                putLong("KEY_SEEK_POSITION", position)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save seek position", e)
         }
@@ -627,10 +629,9 @@ class MusicPlayerManager @Inject constructor(
                         duration = player.duration.coerceAtLeast(0)
                     )
                     try {
-                        val sharedPreferences = getPlaybackPreferences(context)
-                        sharedPreferences.edit()
-                            .putLong("KEY_SEEK_POSITION", pos)
-                            .apply()
+                        getPlaybackPreferences(context).edit {
+                            putLong("KEY_SEEK_POSITION", pos)
+                        }
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to save progress seek position", e)
                     }
@@ -705,7 +706,6 @@ class MusicPlayerManager @Inject constructor(
             .setAlbumTitle(song.album.name)
             .setArtworkUri(artworkUri)
             .setIsPlayable(true)
-            .setFolderType(MediaMetadata.FOLDER_TYPE_NONE)
             .build()
 
         return MediaItem.Builder()

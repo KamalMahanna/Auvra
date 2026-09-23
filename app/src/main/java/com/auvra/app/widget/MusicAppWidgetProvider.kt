@@ -8,11 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Shader
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 import android.os.Build
 import android.util.Log
 import android.widget.RemoteViews
@@ -293,12 +294,12 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
                 val x = (src.width - size) / 2
                 val y = (src.height - size) / 2
                 val squared = Bitmap.createBitmap(src, x, y, size, size)
-                Bitmap.createScaledBitmap(squared, targetSize, targetSize, true)
+                squared.scale(targetSize, targetSize)
             } else {
                 src
             }
 
-            val output = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
+            val output = createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(output)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = BitmapShader(scaled, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)

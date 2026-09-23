@@ -77,7 +77,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import com.auvra.app.ui.components.OfflineBanner
 
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import android.util.Log
 import androidx.compose.ui.platform.LocalContext
 import com.auvra.app.ui.components.UpdateDialog
@@ -279,7 +279,7 @@ fun AuvraNavGraph(
                 onDownload = {
                     updateViewModel.dismissUpdate(release)
                     try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(release.downloadUrl)).apply {
+                        val intent = Intent(Intent.ACTION_VIEW, release.downloadUrl.toUri()).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         context.startActivity(intent)

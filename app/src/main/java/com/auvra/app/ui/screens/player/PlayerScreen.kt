@@ -696,6 +696,7 @@ fun QueueView(
                     items = queue,
                     key = { index, song -> "${song.id}_$index" }
                 ) { index, song ->
+                    @Suppress("DEPRECATION")
                     val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = { value ->
                             if (value == SwipeToDismissBoxValue.StartToEnd) {

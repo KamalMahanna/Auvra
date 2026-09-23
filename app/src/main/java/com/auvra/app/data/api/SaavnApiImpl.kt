@@ -1,5 +1,8 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.auvra.app.data.api
 
+import android.annotation.SuppressLint
 import android.util.Base64
 import com.auvra.app.data.model.*
 import com.auvra.app.utils.SongDeduplicator
@@ -118,6 +121,8 @@ class SaavnApiImpl @Inject constructor(
         }
     }
 
+    // JioSaavn encrypts media stream URLs using DES/ECB/PKCS5Padding with a known static key.
+    @SuppressLint("GetInstance")
     private fun createDownloadLinks(encryptedUrl: String?): List<DownloadLink> {
         if (encryptedUrl.isNullOrEmpty()) return emptyList()
         return try {
