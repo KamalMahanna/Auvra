@@ -76,6 +76,13 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.mymusic.app.ui.components.OfflineBanner
 
+import android.content.Intent
+import android.net.Uri
+import android.util.Log
+import androidx.compose.ui.platform.LocalContext
+import com.mymusic.app.ui.components.UpdateDialog
+import com.mymusic.app.ui.screens.update.AppUpdateViewModel
+
 sealed class Screen(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Home : Screen("home", "Home", Icons.Rounded.Home)
     object Search : Screen("search", "Search", Icons.Rounded.Search)
@@ -90,7 +97,8 @@ val items = listOf(
 
 @Composable
 fun MyMusicNavGraph(
-    playerViewModel: PlayerViewModel = hiltViewModel()
+    playerViewModel: PlayerViewModel = hiltViewModel(),
+    updateViewModel: AppUpdateViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
     var isPlayerExpanded by remember { mutableStateOf(false) }
@@ -260,6 +268,30 @@ fun MyMusicNavGraph(
                 .statusBarsPadding()
                 .padding(top = 8.dp)
         )
+
+        // New Version Update Dialog (shown on app launch when an update is available)
+        val availableUpdate by updateViewModel.availableUpdate.collectAsState()
+        availableUpdate?.let { release ->
+            val context = LocalContext.current
+            UpdateDialog(
+                release = release,
+                currentVersion = updateViewModel.installedVersion,
+                onDownload = {
+                    updateViewModel.dismissUpdate(release)
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(release.downloadUrl)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Log.e("NavGraph", "Failed to launch download URL: ${e.message}", e)
+                    }
+                },
+                onDismiss = {
+                    updateViewModel.dismissForNow()
+                }
+            )
+        }
     }
 }
 

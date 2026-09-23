@@ -17,6 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -24,6 +27,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.mymusic.app.ui.screens.player.PlayerViewModel
 import com.mymusic.app.ui.components.SongListItem
+import com.mymusic.app.ui.screens.update.AppUpdateViewModel
 
 @Composable
 fun LibraryScreen(
@@ -31,12 +35,15 @@ fun LibraryScreen(
     onPlaySong: () -> Unit,
     bottomPadding: Dp,
     viewModel: LibraryViewModel = hiltViewModel(),
-    playerViewModel: PlayerViewModel = hiltViewModel()
+    playerViewModel: PlayerViewModel = hiltViewModel(),
+    updateViewModel: AppUpdateViewModel = hiltViewModel()
 ) {
     val songs by viewModel.downloadedSongs.collectAsState()
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
+    val isOnline by playerViewModel.isOnline.collectAsState()
+    val context = LocalContext.current
 
     var searchQuery by remember { mutableStateOf("") }
     var isSearching by remember { mutableStateOf(false) }
@@ -140,12 +147,28 @@ fun LibraryScreen(
                         text = "Downloads",
                         style = MaterialTheme.typography.headlineMedium
                     )
-                    IconButton(onClick = { isSearching = true }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Search,
-                            contentDescription = "Search downloads",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = {
+                            if (!isOnline) {
+                                Toast.makeText(context, "No internet connection", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Checking for updates...", Toast.LENGTH_SHORT).show()
+                                updateViewModel.checkForUpdate(force = true)
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Rounded.SystemUpdate,
+                                contentDescription = "Check for updates",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { isSearching = true }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = "Search downloads",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
