@@ -15,6 +15,9 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.mp4.Mp4Extractor
 import com.mymusic.app.data.model.Song
 import com.mymusic.app.data.repository.DownloadRepository
 import android.os.Handler
@@ -98,7 +101,11 @@ class MusicPlayerManager @Inject constructor(
                 } else {
                     val mediaItems = newQueue.map { buildMediaItem(it) }
                     val safeIndex = if (newIndex in mediaItems.indices) newIndex else 0
-                    player.setMediaItems(mediaItems, safeIndex, if (safeIndex == newIndex) currentPos else 0L)
+                    val currentItem = player.currentMediaItem
+                    val targetSong = if (safeIndex in newQueue.indices) newQueue[safeIndex] else null
+                    val isSameSong = currentItem != null && targetSong != null && currentItem.mediaId == targetSong.id
+                    val startPos = if (isSameSong) currentPos else 0L
+                    player.setMediaItems(mediaItems, safeIndex, startPos)
                     if (isPlaying) {
                         player.play()
                     }
@@ -121,7 +128,12 @@ class MusicPlayerManager @Inject constructor(
         val player = exoPlayer
         if (player != null) return forwardingPlayer ?: player
 
+        val extractorsFactory = DefaultExtractorsFactory()
+            .setMp4ExtractorFlags(Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS)
+        val mediaSourceFactory = DefaultMediaSourceFactory(context, extractorsFactory)
+
         val newExoPlayer = ExoPlayer.Builder(context)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -194,6 +206,9 @@ class MusicPlayerManager @Inject constructor(
                                     duration = exo.duration.coerceAtLeast(0)
                                 )
                                 releaseTransitionWakeLock()
+                                if (exo.volume < 1f) {
+                                    exo.volume = 1f
+                                }
                             }
                             Player.STATE_ENDED -> {
                                 Log.d(TAG, "Playback ended for entire timeline")
@@ -213,6 +228,9 @@ class MusicPlayerManager @Inject constructor(
 
                     override fun onPlayerError(error: PlaybackException) {
                         Log.w(TAG, "ExoPlayer error (${error.errorCode}): ${error.message}", error)
+                        if (exo.volume < 1f) {
+                            exo.volume = 1f
+                        }
                         val isNetworkErr = !networkMonitor.isOnlineNow() ||
                             error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
                             error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
@@ -254,7 +272,14 @@ class MusicPlayerManager @Inject constructor(
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         Log.d(TAG, "onIsPlayingChanged: isPlaying=$isPlaying")
                         _playbackState.value = _playbackState.value.copy(isPlaying = isPlaying)
-                        if (isPlaying) startProgressUpdate() else stopProgressUpdate()
+                        if (isPlaying) {
+                            if (exo.volume < 1f) {
+                                exo.volume = 1f
+                            }
+                            startProgressUpdate()
+                        } else {
+                            stopProgressUpdate()
+                        }
                     }
                 })
 
@@ -392,6 +417,13 @@ class MusicPlayerManager @Inject constructor(
             return
         }
 
+        // Halt any ongoing playback and mute immediately to eliminate residual audio buffer leakage
+        if (player.isPlaying || player.playbackState == Player.STATE_BUFFERING) {
+            player.volume = 0f
+            player.stop()
+            player.clearMediaItems()
+        }
+
         player.setMediaItems(mediaItems, safeIndex, seekPosition)
         player.prepare()
         player.play()
@@ -415,6 +447,9 @@ class MusicPlayerManager @Inject constructor(
         Log.d(TAG, "playNext() invoked")
         val player = exoPlayer
         if (player != null && player.hasNextMediaItem()) {
+            if (player.isPlaying || player.playWhenReady) {
+                player.volume = 0f
+            }
             player.seekToNextMediaItem()
             if (player.playbackState == Player.STATE_IDLE) {
                 player.prepare()
@@ -442,6 +477,9 @@ class MusicPlayerManager @Inject constructor(
         Log.d(TAG, "playPrevious() invoked")
         val player = exoPlayer
         if (player != null && player.hasPreviousMediaItem() && player.currentPosition < 3000) {
+            if (player.isPlaying || player.playWhenReady) {
+                player.volume = 0f
+            }
             player.seekToPreviousMediaItem()
             if (player.playbackState == Player.STATE_IDLE) {
                 player.prepare()
@@ -502,6 +540,9 @@ class MusicPlayerManager @Inject constructor(
         Log.d(TAG, "jumpToQueueIndex: index=$index")
         val player = exoPlayer
         if (player != null && index in 0 until player.mediaItemCount) {
+            if (player.isPlaying || player.playWhenReady) {
+                player.volume = 0f
+            }
             queueManager.jumpTo(index)
             player.seekToDefaultPosition(index)
             if (player.playbackState == Player.STATE_IDLE) {

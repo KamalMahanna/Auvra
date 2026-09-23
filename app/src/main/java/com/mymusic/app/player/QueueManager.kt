@@ -169,7 +169,6 @@ class QueueManager @Inject constructor(
         _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, finalQueue.size - 1)
         Log.d(TAG, "setQueue: new index=${_currentIndex.value}, song='${currentSong?.name}'")
         saveState()
-        onQueueReset?.invoke(_queue.value, _currentIndex.value)
     }
 
     /**
@@ -215,7 +214,6 @@ class QueueManager @Inject constructor(
         _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, finalQueue.size - 1)
         Log.d(TAG, "setStreamingQueue: new index=${_currentIndex.value}, song='${currentSong?.name}'")
         saveState()
-        onQueueReset?.invoke(_queue.value, _currentIndex.value)
     }
 
     fun setDownloadedQueue(songs: List<Song>, startIndex: Int = 0) {
@@ -254,7 +252,6 @@ class QueueManager @Inject constructor(
 
         Log.d(TAG, "setDownloadedQueue initialized: active queue size=${initialBatch.size}, targetSong='${targetSong.name}', nextIndex=$downloadedSourceNextIndex")
         saveState()
-        onQueueReset?.invoke(_queue.value, _currentIndex.value)
     }
 
     fun addToQueue(songs: List<Song>) {
