@@ -3,6 +3,7 @@ package com.mymusic.app.ui.screens.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mymusic.app.data.model.*
+import com.mymusic.app.data.repository.DownloadRepository
 import com.mymusic.app.data.repository.MusicRepository
 import com.mymusic.app.utils.NetworkMonitor
 import com.mymusic.app.utils.SongDeduplicator
@@ -24,6 +25,7 @@ data class SearchUiState(
     val artists: List<SearchArtist> = emptyList(),
     val playlists: List<Playlist> = emptyList(),
     val error: String? = null,
+    val isOfflineMode: Boolean = false,
     val isArtistDetailLoading: Boolean = false,
     val selectedArtistDetail: ArtistDetail? = null,
     val isPlaylistDetailLoading: Boolean = false,
@@ -35,13 +37,36 @@ data class SearchUiState(
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val musicRepository: MusicRepository,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val downloadRepository: DownloadRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var downloadedSongsCache: List<DownloadedSong> = emptyList()
+
+    init {
+        viewModelScope.launch {
+            downloadRepository.downloadedSongs.collect { songs ->
+                downloadedSongsCache = songs
+                if (!networkMonitor.isOnlineNow() && _uiState.value.query.isNotBlank()) {
+                    performOfflineSearch(_uiState.value.query)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            networkMonitor.isOnline.collect { isOnline ->
+                if (isOnline && _uiState.value.isOfflineMode && _uiState.value.query.isNotBlank()) {
+                    performSearch(_uiState.value.query)
+                } else if (!isOnline && _uiState.value.query.isNotBlank() && !_uiState.value.isOfflineMode) {
+                    performOfflineSearch(_uiState.value.query)
+                }
+            }
+        }
+    }
 
     fun retry() {
         performSearch(_uiState.value.query)
@@ -72,21 +97,29 @@ class SearchViewModel @Inject constructor(
                 albums = emptyList(),
                 artists = emptyList(),
                 playlists = emptyList(),
-                isLoading = false
+                isLoading = false,
+                error = null,
+                isOfflineMode = !networkMonitor.isOnlineNow()
             )
             return
         }
 
+        if (!networkMonitor.isOnlineNow()) {
+            performOfflineSearch(query)
+            return
+        }
+
         searchJob = viewModelScope.launch {
-            delay(500) // debounce
+            delay(400) // debounce
             if (!networkMonitor.isOnlineNow()) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "No internet connection"
-                )
+                performOfflineSearch(query)
                 return@launch
             }
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                error = null,
+                isOfflineMode = false
+            )
 
             val songsDeferred = async { musicRepository.searchSongs(query) }
             val albumsDeferred = async { musicRepository.searchAlbums(query) }
@@ -122,7 +155,8 @@ class SearchViewModel @Inject constructor(
                     songs = cleanSongs,
                     albums = cleanAlbums,
                     artists = cleanArtists,
-                    playlists = cleanPlaylists
+                    playlists = cleanPlaylists,
+                    isOfflineMode = false
                 )
             } else {
                 val anyNetworkErr = !networkMonitor.isOnlineNow() ||
@@ -130,18 +164,50 @@ class SearchViewModel @Inject constructor(
                         .mapNotNull { it.exceptionOrNull() }
                         .any { NetworkMonitor.isNetworkError(it) }
 
-                val errorMsg = if (anyNetworkErr) {
-                    "No internet connection"
+                if (anyNetworkErr) {
+                    performOfflineSearch(query)
                 } else {
-                    songsResult.exceptionOrNull()?.message
+                    val errorMsg = songsResult.exceptionOrNull()?.message
                         ?: albumsResult.exceptionOrNull()?.message
                         ?: artistsResult.exceptionOrNull()?.message
                         ?: playlistsResult.exceptionOrNull()?.message
                         ?: "Search failed"
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
             }
         }
+    }
+
+    private fun performOfflineSearch(query: String) {
+        val q = query.trim()
+        if (q.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                songs = emptyList(),
+                albums = emptyList(),
+                artists = emptyList(),
+                playlists = emptyList(),
+                isLoading = false,
+                error = null,
+                isOfflineMode = true
+            )
+            return
+        }
+
+        val matchingSongs = downloadedSongsCache.filter { ds ->
+            ds.name.contains(q, ignoreCase = true) ||
+            ds.artist.contains(q, ignoreCase = true) ||
+            (ds.album?.contains(q, ignoreCase = true) == true)
+        }.map { it.toSong() }
+
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            songs = matchingSongs,
+            albums = emptyList(),
+            artists = emptyList(),
+            playlists = emptyList(),
+            error = null,
+            isOfflineMode = true
+        )
     }
 
     fun selectArtist(artistId: String) {

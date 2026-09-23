@@ -303,6 +303,28 @@ data class DownloadedSong(
         }
 }
 
+fun DownloadedSong.toSong(): Song {
+    val artistList = artist.split(",")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .map { ArtistMap(name = it) }
+
+    return Song(
+        id = id,
+        name = name,
+        url = filePath,
+        duration = duration,
+        album = SongAlbum(id = null, name = album, url = null),
+        artists = SongArtists(primary = artistList),
+        image = if (!imageUrl.isNullOrEmpty()) {
+            listOf(DownloadLink(quality = "500x500", url = imageUrl))
+        } else {
+            emptyList()
+        },
+        downloadUrl = emptyList()
+    )
+}
+
 fun String.unescapeHtml(): String {
     return try {
         android.text.Html.fromHtml(this, android.text.Html.FROM_HTML_MODE_LEGACY).toString()

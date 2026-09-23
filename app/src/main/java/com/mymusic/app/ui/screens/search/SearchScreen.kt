@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.ui.text.style.TextOverflow
 import com.mymusic.app.ui.components.OfflineEmptyState
@@ -58,13 +59,14 @@ enum class SearchCategory {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
-    isPlayerExpanded: Boolean,
     onPlaySong: () -> Unit,
     bottomPadding: Dp,
+    isPlayerExpanded: Boolean = false,
     viewModel: SearchViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isOnline by playerViewModel.isOnline.collectAsState()
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
     val downloadStates by playerViewModel.downloadStates.collectAsState()
@@ -126,7 +128,7 @@ fun SearchScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 16.dp)
                 .focusRequester(focusRequester),
-            placeholder = { Text("Search it") },
+            placeholder = { Text(if (!isOnline || uiState.isOfflineMode) "Search downloaded songs..." else "Search it") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Rounded.Search,
@@ -152,6 +154,29 @@ fun SearchScreen(
                 unfocusedBorderColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.15f)
             )
         )
+
+        if (uiState.isOfflineMode && uiState.query.isNotBlank() && uiState.songs.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DownloadDone,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "${uiState.songs.size} downloaded ${if (uiState.songs.size == 1) "song" else "songs"} found",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
 
         if (uiState.query.isNotBlank() && !uiState.isLoading && uiState.error == null && availableCategories.isNotEmpty()) {
             LazyRow(
@@ -202,6 +227,12 @@ fun SearchScreen(
                 },
                 onRetry = { viewModel.retry() }
             )
+        } else if (uiState.isOfflineMode && uiState.query.isNotBlank() && uiState.songs.isEmpty()) {
+            OfflineEmptyState(
+                title = "No downloaded songs found",
+                description = "No downloaded songs match \"${uiState.query}\". Connect to the internet to search online music.",
+                onRetry = if (isOnline) { { viewModel.retry() } } else null
+            )
         } else {
             key(selectedCategory) {
                 LazyVerticalGrid(
@@ -218,14 +249,21 @@ fun SearchScreen(
                         span = { _, _ -> GridItemSpan(2) } // 2 columns on tablet, 1 column on mobile
                     ) { index, song ->
                         val isDownloading = downloadStates[song.id]?.isDownloading == true
-                        val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
+                        val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id, uiState.isOfflineMode) {
+                            uiState.isOfflineMode || playerViewModel.isSongDownloaded(song)
+                        }
                         val isPlaying = currentPlayingSongId == song.id
                         
-                        val onClick = remember(song) {
+                        val onClick = remember(song, uiState.isOfflineMode, uiState.songs) {
                             {
                                 focusManager.clearFocus()
                                 keyboardController?.hide()
-                                playerViewModel.playSongWithRecommendations(song)
+                                if (uiState.isOfflineMode) {
+                                    val idx = uiState.songs.indexOfFirst { it.id == song.id }
+                                    playerViewModel.playSongFromList(uiState.songs, if (idx != -1) idx else index)
+                                } else {
+                                    playerViewModel.playSongWithRecommendations(song)
+                                }
                                 onPlaySong()
                             }
                         }
@@ -356,7 +394,7 @@ fun SearchScreen(
                 }
 
                 // General empty state
-                if (availableCategories.isEmpty()) {
+                if (uiState.query.isNotBlank() && availableCategories.isEmpty() && !uiState.isOfflineMode) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Box(
                             modifier = Modifier
