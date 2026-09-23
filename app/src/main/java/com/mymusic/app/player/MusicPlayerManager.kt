@@ -57,6 +57,8 @@ class MusicPlayerManager @Inject constructor(
     private var progressJob: Job? = null
     private var audioDeviceCallback: android.media.AudioDeviceCallback? = null
     private var cachingJob: Job? = null
+    @Volatile
+    private var wasPlayingBeforeDisconnect = false
 
     /**
      * Partial wake lock held during song transitions.
@@ -269,6 +271,21 @@ class MusicPlayerManager @Inject constructor(
                         }
                     }
 
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                        Log.d(TAG, "onPlayWhenReadyChanged: playWhenReady=$playWhenReady, reason=$reason")
+                        if (!playWhenReady) {
+                            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY) {
+                                wasPlayingBeforeDisconnect = true
+                                Log.d(TAG, "Playback paused due to AUDIO_BECOMING_NOISY. wasPlayingBeforeDisconnect set to true")
+                            } else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) {
+                                wasPlayingBeforeDisconnect = false
+                                Log.d(TAG, "Playback paused by user request. wasPlayingBeforeDisconnect cleared")
+                            }
+                        } else {
+                            wasPlayingBeforeDisconnect = false
+                        }
+                    }
+
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         Log.d(TAG, "onIsPlayingChanged: isPlaying=$isPlaying")
                         _playbackState.value = _playbackState.value.copy(isPlaying = isPlaying)
@@ -283,40 +300,52 @@ class MusicPlayerManager @Inject constructor(
                     }
                 })
 
-                // Auto-play when audio device (headphones/bluetooth) connects
+                // Auto-play/resume when Bluetooth audio device connects (matching Metrolist behavior)
+                var isInitialRegistrationCallback = true
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
                 val callback = object : android.media.AudioDeviceCallback() {
                     override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>?) {
-                        val deviceTypes = addedDevices?.map { it.type }?.joinToString(", ") ?: "None"
-                        Log.d(TAG, "Audio devices added: $deviceTypes")
-                        val hasHeadphones = addedDevices?.any { device ->
-                            device.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-                            device.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                        super.onAudioDevicesAdded(addedDevices)
+                        if (isInitialRegistrationCallback) {
+                            Log.d(TAG, "Ignoring initial audio devices added during callback registration")
+                            return
+                        }
+
+                        val hasBluetooth = addedDevices?.any { device ->
                             device.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                            device.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                            device.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
+                            device.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO
                         } == true
 
-                        if (hasHeadphones) {
-                            Log.d(TAG, "Headphones/Bluetooth detected as added. player.mediaItemCount=${exo.mediaItemCount}, player.isPlaying=${exo.isPlaying}")
-                            if (exo.mediaItemCount > 0 && !exo.isPlaying) {
-                                Log.d(TAG, "Resuming playback due to audio device addition")
-                                try {
-                                    val serviceIntent = Intent(context, MusicService::class.java)
-                                    ContextCompat.startForegroundService(context, serviceIntent)
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Failed to start MusicService on audio device addition: ${e.message}", e)
+                        if (hasBluetooth) {
+                            Log.d(
+                                TAG,
+                                "Bluetooth audio device connected. state=${exo.playbackState}, isPlaying=${exo.isPlaying}, wasPlayingBeforeDisconnect=$wasPlayingBeforeDisconnect"
+                            )
+                            val prefs = context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
+                            val resumeOnBluetoothAlways = prefs.getBoolean("KEY_RESUME_ON_BLUETOOTH_CONNECT", false)
+
+                            // Resume only if player is in READY state (loaded and prepared) and not currently playing
+                            if (exo.playbackState == Player.STATE_READY && !exo.isPlaying) {
+                                if (wasPlayingBeforeDisconnect || resumeOnBluetoothAlways) {
+                                    Log.d(TAG, "Resuming playback on Bluetooth connection")
+                                    wasPlayingBeforeDisconnect = false
+                                    try {
+                                        val serviceIntent = Intent(context, MusicService::class.java)
+                                        ContextCompat.startForegroundService(context, serviceIntent)
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Failed to start MusicService on Bluetooth connect: ${e.message}", e)
+                                    }
+                                    exo.play()
                                 }
-                                if (exo.playbackState == Player.STATE_IDLE) {
-                                    exo.prepare()
-                                }
-                                exo.play()
                             }
                         }
                     }
                 }
                 audioManager.registerAudioDeviceCallback(callback, null)
                 audioDeviceCallback = callback
+                Handler(Looper.getMainLooper()).post {
+                    isInitialRegistrationCallback = false
+                }
                 restoreLastPlayedSong(exo)
             }
 
@@ -506,8 +535,10 @@ class MusicPlayerManager @Inject constructor(
         }
         Log.d(TAG, "togglePlayPause: currently playing=${player.isPlaying}")
         if (player.isPlaying) {
+            wasPlayingBeforeDisconnect = false
             player.pause()
         } else {
+            wasPlayingBeforeDisconnect = false
             try {
                 Log.d(TAG, "Starting MusicService on resume")
                 val intent = Intent(context, MusicService::class.java)
