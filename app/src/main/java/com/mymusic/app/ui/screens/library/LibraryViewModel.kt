@@ -5,20 +5,30 @@ import androidx.lifecycle.viewModelScope
 import com.mymusic.app.data.model.DownloadedSong
 import com.mymusic.app.data.model.Song
 import com.mymusic.app.data.repository.DownloadRepository
+import com.mymusic.app.download.SongDownloader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    private val downloadRepository: DownloadRepository
+    private val downloadRepository: DownloadRepository,
+    private val songDownloader: SongDownloader
 ) : ViewModel() {
 
     val downloadedSongs: StateFlow<List<DownloadedSong>> = downloadRepository.downloadedSongs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val isUpdating: StateFlow<Boolean> = combine(
+        downloadRepository.isRefreshing,
+        songDownloader.downloadStates
+    ) { refreshing, states ->
+        refreshing || states.values.any { it.isDownloading }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     init {
         refresh()

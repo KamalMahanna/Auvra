@@ -19,6 +19,9 @@ class AppUpdateViewModel @Inject constructor(
     private val _availableUpdate = MutableStateFlow<AppRelease?>(null)
     val availableUpdate: StateFlow<AppRelease?> = _availableUpdate.asStateFlow()
 
+    private val _isChecking = MutableStateFlow(false)
+    val isChecking: StateFlow<Boolean> = _isChecking.asStateFlow()
+
     val installedVersion: String = appUpdateChecker.getInstalledVersionName()
 
     init {
@@ -28,8 +31,13 @@ class AppUpdateViewModel @Inject constructor(
 
     fun checkForUpdate(force: Boolean = false) {
         viewModelScope.launch {
-            val update = appUpdateChecker.checkForUpdate(force)
-            _availableUpdate.value = update
+            _isChecking.value = true
+            try {
+                val update = appUpdateChecker.checkForUpdate(force)
+                _availableUpdate.value = update
+            } finally {
+                _isChecking.value = false
+            }
         }
     }
 

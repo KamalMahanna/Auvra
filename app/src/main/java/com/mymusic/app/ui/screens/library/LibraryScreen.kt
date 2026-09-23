@@ -15,6 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import android.widget.Toast
@@ -39,6 +41,8 @@ fun LibraryScreen(
     updateViewModel: AppUpdateViewModel = hiltViewModel()
 ) {
     val songs by viewModel.downloadedSongs.collectAsState()
+    val isUpdating by viewModel.isUpdating.collectAsState()
+    val isCheckingUpdate by updateViewModel.isChecking.collectAsState()
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
@@ -56,13 +60,6 @@ fun LibraryScreen(
             focusManager.clearFocus()
             keyboardController?.hide()
         }
-    }
-
-    if (songs.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No downloaded songs yet.")
-        }
-        return
     }
 
     val songList = remember(songs) { viewModel.getAsSongList() }
@@ -173,6 +170,20 @@ fun LibraryScreen(
                 }
             }
         }
+
+        if (isUpdating || isCheckingUpdate) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clip(CircleShape),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    strokeCap = StrokeCap.Round
+                )
+            }
+        }
         
         if (filteredSongList.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -183,7 +194,7 @@ fun LibraryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No matching downloads found",
+                        text = if (searchQuery.isBlank()) "No downloaded songs yet." else "No matching downloads found",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

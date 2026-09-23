@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,6 +31,9 @@ class DownloadRepository @Inject constructor(
 ) {
     private val _downloadedSongs = MutableStateFlow<List<DownloadedSong>>(emptyList())
     val downloadedSongs: Flow<List<DownloadedSong>> = _downloadedSongs.asStateFlow()
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     @Volatile
     private var downloadedFileNames = emptySet<String>()
@@ -124,8 +128,10 @@ class DownloadRepository @Inject constructor(
     }
 
     suspend fun refreshDownloadedSongs() = withContext(Dispatchers.IO) {
-        val dir = downloadDir
-        Log.d(TAG, "refreshDownloadedSongs: Syncing directory '${dir.absolutePath}' with SQLite database")
+        _isRefreshing.value = true
+        try {
+            val dir = downloadDir
+            Log.d(TAG, "refreshDownloadedSongs: Syncing directory '${dir.absolutePath}' with SQLite database")
         if (!dir.exists()) {
             Log.w(TAG, "refreshDownloadedSongs: directory does not exist, clearing database records")
             val dbSongs = downloadedSongDao.getAllDownloadedSongsList()
@@ -254,6 +260,9 @@ class DownloadRepository @Inject constructor(
             }
         } else {
             Log.d(TAG, "refreshDownloadedSongs: Cache is fully synchronized with disk. No scans needed.")
+        }
+        } finally {
+            _isRefreshing.value = false
         }
     }
 
