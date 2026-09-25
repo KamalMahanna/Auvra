@@ -31,7 +31,7 @@ class SongDeduplicatorTest {
 
     @Test
     fun testFeaturedArtistMatch() {
-        val song1 = createSong("id1", "Apna Bana Le", "Arijit Singh, Sachin-Jigar", duration = 261)
+        val song1 = createSong("id1", "Apna Bana Le (feat. Sachin-Jigar)", "Arijit Singh", duration = 261)
         val song2 = createSong("id2", "Apna Bana Le (from Bhediya)", "Arijit Singh", duration = 261)
 
         val result = SongDeduplicator.deduplicate(listOf(song1, song2))

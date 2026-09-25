@@ -17,14 +17,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.FileOutputStream
 import java.io.File
-import org.jaudiotagger.audio.AudioFileIO
-import org.jaudiotagger.tag.FieldKey
-import org.jaudiotagger.tag.images.ArtworkFactory
+import java.io.FileOutputStream
 import java.util.logging.Logger
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
+import org.jaudiotagger.tag.images.ArtworkFactory
 
 data class DownloadState(
     val songId: String = "",
@@ -215,10 +215,6 @@ class SongDownloader @Inject constructor(
             tag.setField(FieldKey.TITLE, song.name)
             tag.setField(FieldKey.ARTIST, song.primaryArtistNames)
             tag.setField(FieldKey.ALBUM, song.album.name ?: "")
-            // Persist the JioSaavn song ID so it survives app data clears.
-            // On rescan, DownloadRepository reads this back to restore the real ID
-            // instead of generating a hash-code placeholder.
-            tag.setField(FieldKey.COMMENT, "saavn_id:${song.id}")
 
             // Download and embed cover art
             val imageBytes = downloadArtworkBytes(song.highQualityImageUrl)

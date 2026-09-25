@@ -8,8 +8,6 @@ import android.util.Log
 import com.auvra.app.data.local.DownloadedSongDao
 import com.auvra.app.data.model.DownloadedSong
 import com.auvra.app.data.model.Song
-import org.jaudiotagger.audio.AudioFileIO
-import org.jaudiotagger.tag.FieldKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -177,7 +175,6 @@ class DownloadRepository @Inject constructor(
                 var album: String? = null
                 var duration: Int? = null
                 var imageUrl: String? = null
-                var saavnId: String? = null
 
                 try {
                     retriever.setDataSource(file.absolutePath)
@@ -220,25 +217,8 @@ class DownloadRepository @Inject constructor(
                     }
                 }
 
-                // Try to recover the original JioSaavn song ID from the COMMENT tag.
-                // SongDownloader writes "saavn_id:<id>" into COMMENT during download.
-                try {
-                    java.util.logging.Logger.getLogger("org.jaudiotagger").level = java.util.logging.Level.OFF
-                    val audioFile = AudioFileIO.read(file)
-                    val tag = audioFile.tag
-                    if (tag != null) {
-                        val comment = tag.getFirst(FieldKey.COMMENT)
-                        if (!comment.isNullOrBlank() && comment.startsWith("saavn_id:")) {
-                            saavnId = comment.removePrefix("saavn_id:")
-                            Log.d(TAG, "refreshDownloadedSongs: Recovered Saavn ID '$saavnId' from '${file.name}'")
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "refreshDownloadedSongs: Could not read COMMENT tag from '${file.name}': ${e.message}")
-                }
-
                 val ds = DownloadedSong(
-                    id = saavnId ?: file.absolutePath.hashCode().toString(),
+                    id = file.absolutePath.hashCode().toString(),
                     name = name,
                     artist = formatArtistNames(artist),
                     album = album,
@@ -262,9 +242,9 @@ class DownloadRepository @Inject constructor(
         } else {
             Log.d(TAG, "refreshDownloadedSongs: Cache is fully synchronized with disk. No scans needed.")
         }
-        } finally {
-            _isRefreshing.value = false
-        }
+    } finally {
+        _isRefreshing.value = false
+    }
     }
 
     fun getCachedArtworkForSong(song: Song): File? {
