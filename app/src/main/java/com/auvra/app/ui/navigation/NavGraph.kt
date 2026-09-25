@@ -73,9 +73,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 
-import androidx.compose.foundation.layout.statusBarsPadding
-import com.auvra.app.ui.components.OfflineBanner
-
 import android.content.Intent
 import androidx.core.net.toUri
 import android.util.Log
@@ -103,7 +100,6 @@ fun AuvraNavGraph(
     val navController = rememberNavController()
     var isPlayerExpanded by remember { mutableStateOf(false) }
 
-    val isOnline by playerViewModel.isOnline.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isMiniPlayerVisible = currentSong != null && !isPlayerExpanded
 
@@ -259,15 +255,6 @@ fun AuvraNavGraph(
                 onCollapse = { isPlayerExpanded = false }
             )
         }
-
-        // Floating Offline Status Banner (at the top, over all screens and sheets)
-        OfflineBanner(
-            isOnline = isOnline,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(top = 8.dp)
-        )
 
         // New Version Update Dialog (shown on app launch when an update is available)
         val availableUpdate by updateViewModel.availableUpdate.collectAsState()
