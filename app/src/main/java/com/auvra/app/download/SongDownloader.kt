@@ -169,7 +169,7 @@ class SongDownloader @Inject constructor(
 
         // Fast-path: Check if song is already cached from playback/streaming and is a valid MP4 container
         val cachedFile = streamingCacheManager.getCachedFileForSong(song)
-        if (cachedFile != null && cachedFile.exists() && cachedFile.length() > 0 && isMp4Container(cachedFile)) {
+        if (cachedFile != null && cachedFile.exists() && cachedFile.length() > 0 && Mp4MetadataEditor.isMp4(cachedFile)) {
             Log.d(TAG, "executeDownload: Found cached MP4 audio in StreamingCacheManager (${cachedFile.length()} bytes). Reusing local cache!")
             _downloadStates.update { it + (song.id to (_downloadStates.value[song.id] ?: DownloadState(song.id, song.name)).copy(progress = 0.5f, isDownloading = true)) }
             updateNotification(song.id, song.name, 50)
@@ -205,6 +205,12 @@ class SongDownloader @Inject constructor(
                         arrayOf(file.absolutePath),
                         arrayOf("audio/mp4"),
                         null
+                    )
+                    context.sendBroadcast(
+                        android.content.Intent(
+                            android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                            android.net.Uri.fromFile(file)
+                        )
                     )
                 } catch (_: Exception) {}
 
@@ -445,6 +451,12 @@ class SongDownloader @Inject constructor(
                     arrayOf("audio/mp4"),
                     null
                 )
+                context.sendBroadcast(
+                    android.content.Intent(
+                        android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                        android.net.Uri.fromFile(file)
+                    )
+                )
             } catch (_: Exception) {}
 
             if (savedArtwork == null) {
@@ -573,24 +585,22 @@ class SongDownloader @Inject constructor(
         return if (url.startsWith("//")) "https:$url" else url
     }
 
-    private fun isMp4Container(file: File): Boolean {
-        if (!file.exists() || file.length() < 12) return false
-        return try {
-            file.inputStream().use { input ->
-                val header = ByteArray(12)
-                val read = input.read(header)
-                if (read < 12) return@use false
-                header[4] == 'f'.code.toByte() &&
-                header[5] == 't'.code.toByte() &&
-                header[6] == 'y'.code.toByte() &&
-                header[7] == 'p'.code.toByte()
-            }
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     private fun writeMetadataTags(file: File, song: Song, artworkBytes: ByteArray?) {
+        if (Mp4MetadataEditor.isMp4(file)) {
+            val success = Mp4MetadataEditor.writeMetadata(
+                file = file,
+                title = song.name,
+                artist = song.primaryArtistNames,
+                album = song.album.name?.takeIf { it.isNotBlank() },
+                artworkBytes = artworkBytes
+            )
+            if (success) {
+                Log.d(TAG, "writeMetadataTags: Successfully embedded MP4 metadata & cover art for '${song.name}' using Mp4MetadataEditor")
+                return
+            }
+            Log.w(TAG, "writeMetadataTags: Mp4MetadataEditor returned false for '${file.name}', falling back to jaudiotagger")
+        }
+
         try {
             Logger.getLogger("org.jaudiotagger").level = java.util.logging.Level.OFF
             val audioFile = AudioFileIO.read(file)
