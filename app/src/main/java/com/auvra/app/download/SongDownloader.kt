@@ -167,10 +167,10 @@ class SongDownloader @Inject constructor(
             return@withContext true
         }
 
-        // Fast-path: Check if song is already cached from playback/streaming
+        // Fast-path: Check if song is already cached from playback/streaming and is a valid MP4 container
         val cachedFile = streamingCacheManager.getCachedFileForSong(song)
-        if (cachedFile != null && cachedFile.exists() && cachedFile.length() > 0) {
-            Log.d(TAG, "executeDownload: Found cached audio in StreamingCacheManager (${cachedFile.length()} bytes). Reusing local cache!")
+        if (cachedFile != null && cachedFile.exists() && cachedFile.length() > 0 && isMp4Container(cachedFile)) {
+            Log.d(TAG, "executeDownload: Found cached MP4 audio in StreamingCacheManager (${cachedFile.length()} bytes). Reusing local cache!")
             _downloadStates.update { it + (song.id to (_downloadStates.value[song.id] ?: DownloadState(song.id, song.name)).copy(progress = 0.5f, isDownloading = true)) }
             updateNotification(song.id, song.name, 50)
 
@@ -203,7 +203,7 @@ class SongDownloader @Inject constructor(
                     MediaScannerConnection.scanFile(
                         context,
                         arrayOf(file.absolutePath),
-                        arrayOf("audio/mp4", "audio/m4a"),
+                        arrayOf("audio/mp4"),
                         null
                     )
                 } catch (_: Exception) {}
@@ -245,11 +245,9 @@ class SongDownloader @Inject constructor(
         }
 
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val playbackData = InnerTubeXPlayer.playerResponseForPlayback(
+        val playbackData = InnerTubeXPlayer.playerResponseForDownload(
             videoId = song.id,
-            audioQuality = AudioQuality.HIGH,
             connectivityManager = cm,
-            allowBoundedRange = false
         ).getOrNull()
 
         val downloadUrl = song.highQualityDownloadUrl ?: playbackData?.streamUrl
@@ -444,7 +442,7 @@ class SongDownloader @Inject constructor(
                 MediaScannerConnection.scanFile(
                     context,
                     arrayOf(file.absolutePath),
-                    arrayOf("audio/mp4", "audio/m4a"),
+                    arrayOf("audio/mp4"),
                     null
                 )
             } catch (_: Exception) {}
@@ -575,6 +573,23 @@ class SongDownloader @Inject constructor(
         return if (url.startsWith("//")) "https:$url" else url
     }
 
+    private fun isMp4Container(file: File): Boolean {
+        if (!file.exists() || file.length() < 12) return false
+        return try {
+            file.inputStream().use { input ->
+                val header = ByteArray(12)
+                val read = input.read(header)
+                if (read < 12) return@use false
+                header[4] == 'f'.code.toByte() &&
+                header[5] == 't'.code.toByte() &&
+                header[6] == 'y'.code.toByte() &&
+                header[7] == 'p'.code.toByte()
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun writeMetadataTags(file: File, song: Song, artworkBytes: ByteArray?) {
         try {
             Logger.getLogger("org.jaudiotagger").level = java.util.logging.Level.OFF
@@ -608,7 +623,7 @@ class SongDownloader @Inject constructor(
             audioFile.commit()
             Log.d(TAG, "writeMetadataTags: Successfully embedded ID3/MP4 metadata & cover art for '${song.name}'")
         } catch (e: Throwable) {
-            Log.w(TAG, "writeMetadataTags: Failed for '${file.name}': ${e.message}")
+            Log.w(TAG, "writeMetadataTags: Failed for '${file.name}': ${e.message}", e)
         }
     }
 

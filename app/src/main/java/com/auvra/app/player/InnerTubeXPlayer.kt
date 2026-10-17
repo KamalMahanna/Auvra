@@ -67,7 +67,8 @@ object InnerTubeXPlayer {
         contentHints: ContentHints = ContentHints(),
         allowBoundedRange: Boolean = true,
     ): Result<PlaybackData> {
-        val cached = playbackDataCache[videoId]
+        val cacheKey = "${videoId}_${audioQuality.name}_$allowBoundedRange"
+        val cached = playbackDataCache[cacheKey]
         if (cached != null && System.currentTimeMillis() < cached.expiresAtMs) {
             return Result.success(cached.data)
         }
@@ -97,7 +98,7 @@ object InnerTubeXPlayer {
             check(stream.sabrBootstrap == null) { "SABR is not supported by this playback engine" }
             val playbackData = stream.toPlaybackData()
             val ttlMs = (playbackData.streamExpiresInSeconds.toLong() * 1000L).coerceIn(30_000L, 5 * 60 * 1000L)
-            playbackDataCache[videoId] = CachedPlaybackData(playbackData, System.currentTimeMillis() + ttlMs)
+            playbackDataCache[cacheKey] = CachedPlaybackData(playbackData, System.currentTimeMillis() + ttlMs)
             Result.success(playbackData)
         } catch (error: CancellationException) {
             throw error
@@ -115,12 +116,29 @@ object InnerTubeXPlayer {
         }
     }
 
+    /**
+     * Resolves the stream specifically for offline audio file download.
+     * Uses AudioQuality.LOW because InnerTubeX extractor maps this to audio/mp4 (AAC itag 140),
+     * ensuring a genuine MPEG-4 container where ID3/MP4 metadata and cover art ('covr' atom)
+     * can be embedded by jaudiotagger and parsed natively by external music players (Samsung Music,
+     * Google Files, VLC, Apple Music, MediaStore).
+     */
+    suspend fun playerResponseForDownload(
+        videoId: String,
+        connectivityManager: ConnectivityManager,
+    ): Result<PlaybackData> = playerResponseForPlayback(
+        videoId = videoId,
+        audioQuality = AudioQuality.LOW,
+        connectivityManager = connectivityManager,
+        allowBoundedRange = false,
+    )
+
     internal fun markStreamClientFailed(
         videoId: String,
         clientName: String,
         nowMs: Long = System.currentTimeMillis(),
     ) {
-        playbackDataCache.remove(videoId)
+        playbackDataCache.keys.removeIf { it.startsWith("${videoId}_") }
         streamClientFailures.compute(videoId) { _, failures ->
             FailedStreamClients(failures?.clientNames.orEmpty() + clientName, nowMs)
         }

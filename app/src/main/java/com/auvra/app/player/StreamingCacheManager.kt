@@ -76,11 +76,9 @@ class StreamingCacheManager @Inject constructor(
         }
 
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-        val playbackData = InnerTubeXPlayer.playerResponseForPlayback(
+        val playbackData = InnerTubeXPlayer.playerResponseForDownload(
             videoId = song.id,
-            audioQuality = AudioQuality.HIGH,
             connectivityManager = cm,
-            allowBoundedRange = false,
         ).getOrNull()
 
         val downloadUrl = song.highQualityDownloadUrl ?: playbackData?.streamUrl
