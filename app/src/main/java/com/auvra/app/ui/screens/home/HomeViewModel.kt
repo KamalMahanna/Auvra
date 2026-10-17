@@ -5,100 +5,265 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.auvra.app.data.model.Album
 import com.auvra.app.data.model.ArtistDetail
+import com.auvra.app.data.model.CommunityPlaylistItem
+import com.auvra.app.data.model.DailyDiscoverItem
+import com.auvra.app.data.model.DownloadLink
+import com.auvra.app.data.model.DownloadedSong
 import com.auvra.app.data.model.ModuleItem
 import com.auvra.app.data.model.ModuleSection
+import com.auvra.app.data.model.MoodAndGenreItem
 import com.auvra.app.data.model.Playlist
 import com.auvra.app.data.model.Song
+import com.auvra.app.data.model.SongArtists
+import com.auvra.app.data.model.ArtistMap
+import com.auvra.app.data.model.toSong
+import com.auvra.app.data.model.toModuleItem
+import com.auvra.app.data.repository.DownloadRepository
 import com.auvra.app.data.repository.MusicRepository
+import com.auvra.app.data.repository.PlaybackHistoryRepository
 import com.auvra.app.player.MusicPlayerManager
 import com.auvra.app.utils.SongDeduplicator
-import com.auvra.app.utils.NetworkMonitor
+import com.auvra.app.utils.resize
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.random.Random
 
 data class HomeUiState(
     val isLoading: Boolean = false,
-    val sections: List<ModuleSection> = emptyList(),
+    val isRefreshing: Boolean = false,
+    val speedDialItems: List<ModuleItem> = emptyList(),
+    val trendingSongs: List<Song> = emptyList(),
+    val communityPlaylists: List<CommunityPlaylistItem> = emptyList(),
+    val newReleases: List<Album> = emptyList(),
+    val isRandomizing: Boolean = false,
     val error: String? = null,
     val selectedPlaylist: Playlist? = null,
     val selectedAlbum: Album? = null,
     val selectedArtistDetail: ArtistDetail? = null
-)
+) {
+    val quickPicks: List<Song> get() = trendingSongs
+}
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val musicRepository: MusicRepository,
     private val musicPlayerManager: MusicPlayerManager,
-    private val networkMonitor: NetworkMonitor
+    private val downloadRepository: DownloadRepository,
+    private val playbackHistoryRepository: PlaybackHistoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    private var chartFallbackSongs: List<Song> = emptyList()
+
     init {
-        loadModules()
+        loadHomeFeed()
+        observePlaybackHistory()
     }
 
-    fun retry() {
-        loadModules()
-    }
-
-    fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
-    }
-
-    private fun loadModules() {
-        val cached = musicRepository.getCachedModules()
-        if (cached != null) {
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                sections = cached.sortedBy { it.position },
-                error = null
-            )
-        } else {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-        }
+    private fun observePlaybackHistory() {
         viewModelScope.launch {
-            val result = musicRepository.getModules()
-            result.onSuccess { sections ->
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    sections = sections.sortedBy { it.position }
-                )
-            }.onFailure { e ->
-                if (_uiState.value.sections.isEmpty()) {
-                    val errorMsg = if (!networkMonitor.isOnlineNow() || NetworkMonitor.isNetworkError(e)) {
-                        "No internet connection"
-                    } else {
-                        e.message ?: "Failed to load music"
-                    }
+            combine(
+                playbackHistoryRepository.pinnedSpeedDialItems,
+                playbackHistoryRepository.recentlyPlayedModuleItems,
+                playbackHistoryRepository.quickPicks,
+                downloadRepository.downloadedSongs
+            ) { pinned, recent, quickPicks, downloads ->
+                buildFeedData(pinned, recent, quickPicks, downloads, chartFallbackSongs)
+            }.collect { (speedDial, trending) ->
+                if (speedDial.isNotEmpty() || trending.isNotEmpty()) {
                     _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = errorMsg
+                        speedDialItems = speedDial,
+                        trendingSongs = trending
                     )
                 }
             }
         }
     }
 
-    private fun sanitizeError(e: Throwable, fallback: String): String {
-        return if (!networkMonitor.isOnlineNow() || NetworkMonitor.isNetworkError(e)) {
-            "No internet connection. Connect to stream music."
+    private fun buildFeedData(
+        pinned: List<ModuleItem>,
+        recent: List<ModuleItem>,
+        quickPicks: List<Song>,
+        downloads: List<DownloadedSong>,
+        fallbackCharts: List<Song>
+    ): Pair<List<ModuleItem>, List<Song>> {
+        val downloadedSongs = downloads.map { it.toSong() }
+        val downloadedModuleItems = downloads.map { it.toModuleItem() }
+        val fallbackModuleItems = fallbackCharts.map { it.toModuleItem() }
+
+        // Trending songs / Quick Picks: local quick picks first, then downloaded songs, padded by US charts up to 20
+        val trending = (quickPicks + downloadedSongs + fallbackCharts)
+            .distinctBy { it.id }
+            .take(20)
+
+        // Speed dial: pinned items first, then recently played, then quick picks, then downloads, padded by US charts up to 27
+        val speedDial = (pinned + recent + quickPicks.map { it.toModuleItem() } + downloadedModuleItems + fallbackModuleItems)
+            .distinctBy { it.id }
+            .take(27)
+
+        return Pair(speedDial, trending)
+    }
+
+    fun loadHomeFeed(forceRefresh: Boolean = false) {
+        if (!forceRefresh) {
+            if (_uiState.value.speedDialItems.isEmpty() && _uiState.value.trendingSongs.isEmpty()) {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            }
         } else {
-            e.message ?: fallback
+            _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
+        }
+
+        viewModelScope.launch {
+            try {
+                // Step 1: Load local data immediately from Room / Download repository (instant local DB)
+                val downloaded = try { downloadRepository.downloadedSongs.first() } catch (e: Exception) { emptyList() }
+                val localQuickPicks = try { playbackHistoryRepository.quickPicks.first() } catch (e: Exception) { emptyList() }
+                val localRecent = try { playbackHistoryRepository.recentlyPlayedModuleItems.first() } catch (e: Exception) { emptyList() }
+                val pinned = try { playbackHistoryRepository.pinnedSpeedDialItems.first() } catch (e: Exception) { emptyList() }
+
+                // If local items exist, immediately render them (instant local-first launch)
+                if (localRecent.isNotEmpty() || localQuickPicks.isNotEmpty() || downloaded.isNotEmpty()) {
+                    val (speedDial, trending) = buildFeedData(pinned, localRecent, localQuickPicks, downloaded, chartFallbackSongs)
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        speedDialItems = speedDial,
+                        trendingSongs = trending
+                    )
+                }
+
+                // Step 2: Fetch US Top 50 Chart songs (curated US chart, bypasses GeoIP)
+                val chartResult = musicRepository.getUsTopChartSongs()
+                val chartSongs = chartResult.getOrDefault(emptyList())
+                if (chartSongs.isNotEmpty()) {
+                    chartFallbackSongs = chartSongs
+                }
+
+                // Step 3: Rebuild with US Chart fallback
+                val (speedDial, trending) = buildFeedData(pinned, localRecent, localQuickPicks, downloaded, chartFallbackSongs)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    speedDialItems = speedDial,
+                    trendingSongs = trending,
+                    error = null
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading home feed", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    error = if (_uiState.value.speedDialItems.isEmpty()) e.message else null
+                )
+            }
+
+            // Step 4: Concurrently load Community Playlists and New Releases
+            launch(Dispatchers.IO) {
+                loadCommunityPlaylists()
+            }
+            launch(Dispatchers.IO) {
+                loadNewReleases()
+            }
+        }
+    }
+
+    private suspend fun loadCommunityPlaylists() {
+        val result = musicRepository.getCommunityPlaylists()
+        result.onSuccess { playlists ->
+            if (playlists.isNotEmpty()) {
+                _uiState.value = _uiState.value.copy(communityPlaylists = playlists)
+            }
+        }
+    }
+
+    private suspend fun loadNewReleases() {
+        val result = musicRepository.getNewReleases()
+        result.onSuccess { albums ->
+            if (albums.isNotEmpty()) {
+                _uiState.value = _uiState.value.copy(newReleases = albums)
+            }
+        }
+    }
+
+    fun refresh() {
+        loadHomeFeed(forceRefresh = true)
+    }
+
+    fun loadMore() {
+        // Decluttered feed has fixed curated sections
+    }
+
+    fun openAlbum(album: Album) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(selectedAlbum = album)
+            val result = musicRepository.getAlbumById(album.id)
+            result.onSuccess { fullAlbum ->
+                if (_uiState.value.selectedAlbum?.id == album.id) {
+                    _uiState.value = _uiState.value.copy(selectedAlbum = fullAlbum)
+                }
+            }
+        }
+    }
+
+    fun getRandomItem(onPlay: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isRandomizing = true)
+                delay(700) // Visual dice roll animation
+
+                val allAvailableSongs = mutableListOf<Song>()
+                allAvailableSongs.addAll(_uiState.value.trendingSongs)
+                _uiState.value.communityPlaylists.forEach {
+                    allAvailableSongs.addAll(it.previewSongs)
+                }
+
+                val randomSong = allAvailableSongs.distinctBy { it.id }.shuffled().firstOrNull()
+                if (randomSong != null) {
+                    playSong(randomSong)
+                    onPlay()
+                }
+            } finally {
+                _uiState.value = _uiState.value.copy(isRandomizing = false)
+            }
+        }
+    }
+
+    fun playSong(song: Song) {
+        musicPlayerManager.playSongWithRecommendations(song)
+    }
+
+    fun playSongFromList(songs: List<Song>, index: Int) {
+        if (songs.isNotEmpty()) {
+            musicPlayerManager.playSongFromQueue(songs, index.coerceIn(0, songs.size - 1))
+        }
+    }
+
+    fun playAllSongs(songs: List<Song>) {
+        if (songs.isNotEmpty()) {
+            musicPlayerManager.playSongFromQueue(songs, 0)
+        }
+    }
+
+    fun playAllSongs(section: ModuleSection) {
+        val songs = section.data
+            .filter { it.type.lowercase().trim() == "song" }
+            .map { it.toSong() }
+        if (songs.isNotEmpty()) {
+            musicPlayerManager.playSongFromQueue(songs, 0)
         }
     }
 
     fun playModuleItem(item: ModuleItem) {
         Log.d(TAG, "playModuleItem: id='${item.id}', type='${item.type}', name='${item.name}'")
-        if (!networkMonitor.isOnlineNow()) {
-            _uiState.value = _uiState.value.copy(error = "No internet connection. Connect to stream music.")
-            return
-        }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(error = null)
             try {
@@ -116,7 +281,7 @@ class HomeViewModel @Inject constructor(
                             musicPlayerManager.playSongWithRecommendations(song)
                         }.onFailure { e ->
                             Log.e(TAG, "Failed to load song", e)
-                            _uiState.value = _uiState.value.copy(error = sanitizeError(e, "Failed to load song"))
+                            _uiState.value = _uiState.value.copy(error = "Failed to load song: ${e.message}")
                             musicPlayerManager.clearLoadingState(item.id)
                         }
                     }
@@ -142,7 +307,7 @@ class HomeViewModel @Inject constructor(
                             if (current != null && current.id == item.id && current.songs == null) {
                                 _uiState.value = _uiState.value.copy(
                                     selectedPlaylist = null,
-                                    error = sanitizeError(e, "Failed to load playlist")
+                                    error = "Failed to load playlist: ${e.message}"
                                 )
                             }
                         }
@@ -169,7 +334,7 @@ class HomeViewModel @Inject constructor(
                             if (current != null && current.id == item.id && current.songs == null) {
                                 _uiState.value = _uiState.value.copy(
                                     selectedAlbum = null,
-                                    error = sanitizeError(e, "Failed to load album")
+                                    error = "Failed to load album: ${e.message}"
                                 )
                             }
                         }
@@ -198,7 +363,7 @@ class HomeViewModel @Inject constructor(
                             if (current != null && current.id == item.id && current.topSongs == null) {
                                 _uiState.value = _uiState.value.copy(
                                     selectedArtistDetail = null,
-                                    error = sanitizeError(e, "Failed to load artist")
+                                    error = "Failed to load artist: ${e.message}"
                                 )
                             }
                         }
@@ -210,6 +375,25 @@ class HomeViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Error in playModuleItem", e)
                 _uiState.value = _uiState.value.copy(error = "An error occurred: ${e.message}")
+            }
+        }
+    }
+
+    fun openMoodOrGenre(item: MoodAndGenreItem) {
+        viewModelScope.launch {
+            if (item.params != null || item.browseId.isNotEmpty()) {
+                val feedResult = musicRepository.getHomeFeed(params = item.params, forceRefresh = true)
+                feedResult.onSuccess { feed ->
+                    val playlistSongs = feed.sections.flatMap { it.data }.filter { it.type.lowercase().trim() == "song" }.map { it.toSong() }
+                    if (playlistSongs.isNotEmpty()) {
+                        val pseudoPlaylist = Playlist(
+                            id = item.browseId,
+                            name = item.title,
+                            songs = playlistSongs
+                        )
+                        _uiState.value = _uiState.value.copy(selectedPlaylist = pseudoPlaylist)
+                    }
+                }
             }
         }
     }

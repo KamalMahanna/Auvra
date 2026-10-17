@@ -2,7 +2,6 @@ package com.auvra.app.player
 
 import android.content.Context
 import android.util.Log
-import androidx.core.content.edit
 import com.auvra.app.data.model.Song
 import com.auvra.app.data.repository.DownloadRepository
 import com.auvra.app.data.repository.MusicRepository
@@ -51,7 +50,7 @@ class QueueManager @Inject constructor(
     private var isDownloadedQueueMode: Boolean = false
 
     private val saveScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val sharedPreferences = getPlaybackPreferences(context)
+    private val sharedPreferences = context.getSharedPreferences("auvra_playback_prefs", Context.MODE_PRIVATE)
 
     val currentSong: Song?
         get() {
@@ -77,12 +76,12 @@ class QueueManager @Inject constructor(
                 val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Song::class.java)
                 val json = moshi.adapter<List<Song>>(listType).toJson(_queue.value)
                 val originalJson = moshi.adapter<List<Song>>(listType).toJson(originalQueue)
-                sharedPreferences.edit {
-                    putString("KEY_QUEUE", json)
-                    putInt("KEY_CURRENT_INDEX", _currentIndex.value)
-                    putBoolean("KEY_SHUFFLE_ENABLED", _isShuffleEnabled.value)
-                    putString("KEY_ORIGINAL_QUEUE", originalJson)
-                }
+                sharedPreferences.edit()
+                    .putString("KEY_QUEUE", json)
+                    .putInt("KEY_CURRENT_INDEX", _currentIndex.value)
+                    .putBoolean("KEY_SHUFFLE_ENABLED", _isShuffleEnabled.value)
+                    .putString("KEY_ORIGINAL_QUEUE", originalJson)
+                    .apply()
                 Log.d(TAG, "saveState success: queue size=${_queue.value.size}, index=${_currentIndex.value}, shuffle=${_isShuffleEnabled.value}")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save queue state", e)
@@ -126,14 +125,6 @@ class QueueManager @Inject constructor(
     }
 
     fun setQueue(songs: List<Song>, startIndex: Int = 0) {
-        val isDownloaded = songs.isNotEmpty() && songs.any {
-            it.url.startsWith("/") || it.url.startsWith("file:") || downloadRepository.isSongDownloaded(it)
-        }
-        if (isDownloaded) {
-            setDownloadedQueue(songs, startIndex)
-            return
-        }
-
         isDownloadedQueueMode = false
         fullDownloadedSourceList = emptyList()
 
@@ -170,51 +161,7 @@ class QueueManager @Inject constructor(
         _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, finalQueue.size - 1)
         Log.d(TAG, "setQueue: new index=${_currentIndex.value}, song='${currentSong?.name}'")
         saveState()
-    }
-
-    /**
-     * Sets the queue in streaming mode, bypassing the downloaded-song detection.
-     * Used by [com.auvra.app.player.MusicPlayerManager.playSongWithRecommendations] so that
-     * clicking a downloaded song outside the Library still fetches API recommendations instead
-     * of switching into downloaded-queue mode.
-     */
-    fun setStreamingQueue(songs: List<Song>, startIndex: Int = 0) {
-        isDownloadedQueueMode = false
-        fullDownloadedSourceList = emptyList()
-
-        Log.d(TAG, "setStreamingQueue: input size=${songs.size}, startIndex=$startIndex")
-        val originalTargetSong = if (startIndex in songs.indices) songs[startIndex] else null
-
-        val uniqueSongs = SongDeduplicator.deduplicate(songs)
-        Log.d(TAG, "setStreamingQueue: after deduplication, queue size=${uniqueSongs.size}")
-
-        originalQueue = uniqueSongs
-
-        val finalQueue = if (_isShuffleEnabled.value && originalTargetSong != null) {
-            val rest = uniqueSongs.toMutableList()
-            rest.remove(originalTargetSong)
-            rest.shuffle()
-            listOf(originalTargetSong) + rest
-        } else {
-            uniqueSongs
-        }
-
-        _queue.value = finalQueue
-        playedSongIds.clear()
-        playedKeys.clear()
-        finalQueue.forEach {
-            playedSongIds.add(it.id)
-            playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
-        }
-
-        val newIndex = if (originalTargetSong != null) {
-            finalQueue.indexOfFirst { it.id == originalTargetSong.id }
-        } else {
-            -1
-        }
-        _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, finalQueue.size - 1)
-        Log.d(TAG, "setStreamingQueue: new index=${_currentIndex.value}, song='${currentSong?.name}'")
-        saveState()
+        onQueueReset?.invoke(_queue.value, _currentIndex.value)
     }
 
     fun setDownloadedQueue(songs: List<Song>, startIndex: Int = 0) {
@@ -253,30 +200,18 @@ class QueueManager @Inject constructor(
 
         Log.d(TAG, "setDownloadedQueue initialized: active queue size=${initialBatch.size}, targetSong='${targetSong.name}', nextIndex=$downloadedSourceNextIndex")
         saveState()
+        onQueueReset?.invoke(_queue.value, _currentIndex.value)
     }
 
     fun addToQueue(songs: List<Song>) {
-        val newSongs = songs.filter { song ->
-            val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
-            !playedSongIds.contains(song.id) && !playedKeys.contains(key)
-        }
-        Log.d(TAG, "addToQueue (bulk): filtered ${songs.size} down to ${newSongs.size} new unique songs")
-        if (newSongs.isNotEmpty()) {
-            val uniqueIncoming = mutableListOf<Song>()
-            val incomingKeys = mutableSetOf<Pair<String, String>>()
-            newSongs.forEach { song ->
-                val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
-                if (incomingKeys.add(key)) {
-                    uniqueIncoming.add(song)
-                }
-            }
-            
+        val uniqueIncoming = songs.distinctBy { it.id }.filter { !playedSongIds.contains(it.id) }
+        Log.d(TAG, "addToQueue (bulk): filtered ${songs.size} down to ${uniqueIncoming.size} new unique songs")
+        if (uniqueIncoming.isNotEmpty()) {
             var updatedQueue = _queue.value + uniqueIncoming
             var updatedIndex = _currentIndex.value
 
             uniqueIncoming.forEach {
                 playedSongIds.add(it.id)
-                playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
             }
 
             // Cap total queue size at max 60 items by trimming older played items
@@ -356,7 +291,7 @@ class QueueManager @Inject constructor(
     }
 
     fun isNearEnd(): Boolean {
-        val near = _currentIndex.value >= _queue.value.size - 3
+        val near = _currentIndex.value >= _queue.value.size - 5
         Log.d(TAG, "isNearEnd: index=${_currentIndex.value}, size=${_queue.value.size}, result=$near")
         return near
     }
@@ -372,7 +307,7 @@ class QueueManager @Inject constructor(
             return
         }
 
-        if (isDownloadedQueueMode) {
+        if (isDownloadedQueueMode && fullDownloadedSourceList.size > 1) {
             Log.d(TAG, "loadMoreSuggestions: appending next batch of downloaded songs")
             isLoadingSuggestions = true
             try {

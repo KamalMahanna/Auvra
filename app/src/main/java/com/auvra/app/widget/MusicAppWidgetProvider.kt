@@ -8,15 +8,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Shader
-import androidx.core.graphics.createBitmap
-import androidx.core.graphics.scale
 import android.os.Build
 import android.util.Log
 import android.widget.RemoteViews
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import coil3.imageLoader
@@ -29,6 +29,7 @@ import com.auvra.app.R
 import com.auvra.app.data.model.Song
 import com.auvra.app.player.MusicService
 import com.auvra.app.player.PlaybackState
+import com.auvra.app.ui.theme.ArtworkColorCache
 import com.auvra.app.ui.theme.ArtworkColorExtractor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -86,9 +87,11 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
         private val widgetScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         private var lastLoadedSongId: String? = null
         private var cachedCircularBitmap: Bitmap? = null
-        private var cachedAccentColor: Int = ArtworkColorExtractor.DEFAULT_ACCENT_COLOR
+        private var cachedRawBitmap: Bitmap? = null
+        private var cachedAccentColor: Int? = null
+        private var lastPlaybackState: PlaybackState? = null
 
-        fun updateAllWidgets(context: Context, playbackState: PlaybackState) {
+        fun updateWidgetColor(context: Context, songId: String?, color: Int) {
             try {
                 val appWidgetManager = AppWidgetManager.getInstance(context) ?: return
                 val componentName = ComponentName(context, MusicAppWidgetProvider::class.java)
@@ -97,25 +100,60 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
                     return
                 }
 
-                val currentSong = playbackState.currentSong
-                val activeAccent = if (currentSong != null) cachedAccentColor else ArtworkColorExtractor.DEFAULT_ACCENT_COLOR
+                if (songId != null && lastPlaybackState?.currentSong?.id != songId) {
+                    return
+                }
 
-                val views = createRemoteViews(context, playbackState, cachedCircularBitmap, activeAccent)
+                cachedAccentColor = color
+
+                val rawBitmap = cachedRawBitmap
+                if (rawBitmap != null && cachedCircularBitmap == null) {
+                    cachedCircularBitmap = createCircularBitmap(rawBitmap, 160)
+                }
+
+                val state = lastPlaybackState ?: PlaybackState()
+                val views = createRemoteViews(context, state, cachedCircularBitmap, color)
+                appWidgetManager.updateAppWidget(widgetIds, views)
+                Log.d(TAG, "Updated widget color profile for songId=$songId: color=$color")
+            } catch (e: Throwable) {
+                Log.e(TAG, "Failed in updateWidgetColor: ${e.message}", e)
+            }
+        }
+
+        fun updateAllWidgets(context: Context, playbackState: PlaybackState) {
+            try {
+                lastPlaybackState = playbackState
+                val appWidgetManager = AppWidgetManager.getInstance(context) ?: return
+                val componentName = ComponentName(context, MusicAppWidgetProvider::class.java)
+                val widgetIds = appWidgetManager.getAppWidgetIds(componentName)
+                if (widgetIds == null || widgetIds.isEmpty()) {
+                    return
+                }
+
+                val currentSong = playbackState.currentSong
+                val accentColor = currentSong?.let { ArtworkColorCache.get(it.id) }
+                    ?: cachedAccentColor
+                    ?: ArtworkColorCache.DEFAULT_ACCENT_COLOR
+
+                val views = createRemoteViews(context, playbackState, cachedCircularBitmap, accentColor)
                 appWidgetManager.updateAppWidget(widgetIds, views)
 
                 if (currentSong != null) {
                     if (currentSong.id != lastLoadedSongId || cachedCircularBitmap == null) {
                         widgetScope.launch {
                             try {
-                                val result = loadSongArtwork(context, currentSong)
-                                val bitmap = result?.first
-                                val accent = result?.second ?: ArtworkColorExtractor.DEFAULT_ACCENT_COLOR
-
-                                cachedCircularBitmap = bitmap
-                                cachedAccentColor = accent
+                                val (rawBitmap, extractedColor) = loadSongArtworkAndColor(context, currentSong)
+                                cachedRawBitmap = rawBitmap
                                 lastLoadedSongId = currentSong.id
+                                val finalColor = extractedColor ?: accentColor
+                                cachedAccentColor = finalColor
 
-                                val updatedViews = createRemoteViews(context, playbackState, bitmap, accent)
+                                val circular = if (rawBitmap != null) {
+                                    createCircularBitmap(rawBitmap, 160)
+                                } else null
+                                cachedCircularBitmap = circular
+
+                                val updatedViews = createRemoteViews(context, playbackState, circular, finalColor)
                                 appWidgetManager.updateAppWidget(widgetIds, updatedViews)
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed to update artwork in widget: ${e.message}", e)
@@ -125,7 +163,8 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
                 } else {
                     lastLoadedSongId = null
                     cachedCircularBitmap = null
-                    cachedAccentColor = ArtworkColorExtractor.DEFAULT_ACCENT_COLOR
+                    cachedRawBitmap = null
+                    cachedAccentColor = null
                 }
             } catch (e: Throwable) {
                 Log.e(TAG, "Error in updateAllWidgets: ${e.message}", e)
@@ -136,7 +175,7 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
             context: Context,
             playbackState: PlaybackState,
             artworkBitmap: Bitmap?,
-            accentColor: Int = ArtworkColorExtractor.DEFAULT_ACCENT_COLOR
+            accentColor: Int
         ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_mini_player)
 
@@ -165,19 +204,6 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_btn_next, nextPendingIntent)
 
-            // Next button tint
-            val song = playbackState.currentSong
-            val nextTint = if (song != null) accentColor else 0xFFE5E7EB.toInt()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                views.setColorStateList(
-                    R.id.widget_btn_next,
-                    "setImageTintList",
-                    ColorStateList.valueOf(nextTint)
-                )
-            } else {
-                views.setInt(R.id.widget_btn_next, "setColorFilter", nextTint)
-            }
-
             // Setup Play/Pause PendingIntent
             val playPauseIntent = Intent(context, MusicAppWidgetProvider::class.java).apply {
                 action = ACTION_PLAY_PAUSE
@@ -190,42 +216,40 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_btn_play_pause, playPausePendingIntent)
 
-            // Update song titles and artist accent color
+            // Update song titles
+            val song = playbackState.currentSong
             if (song != null) {
                 views.setTextViewText(R.id.widget_title, song.name)
                 views.setTextViewText(
                     R.id.widget_artist,
                     song.primaryArtistNames.ifEmpty { "Unknown Artist" }
                 )
-                val hsl = FloatArray(3)
-                ColorUtils.colorToHSL(accentColor, hsl)
-                hsl[1] = (hsl[1] * 0.60f).coerceIn(0.35f, 0.75f)
-                hsl[2] = 0.78f
-                views.setTextColor(R.id.widget_artist, ColorUtils.HSLToColor(hsl))
             } else {
                 views.setTextViewText(R.id.widget_title, context.getString(R.string.app_name))
                 views.setTextViewText(R.id.widget_artist, "Tap to play")
-                views.setTextColor(R.id.widget_artist, 0xFF9CA3AF.toInt())
             }
 
-            // Update Play/Pause icon overlay
+            // Update Play/Pause icon overlay and tint with dynamic accent color
             val playPauseRes = if (playbackState.isPlaying) {
                 R.drawable.ic_widget_pause
             } else {
                 R.drawable.ic_widget_play
             }
             views.setImageViewResource(R.id.widget_play_pause_icon, playPauseRes)
+            views.setInt(R.id.widget_play_pause_icon, "setColorFilter", accentColor)
 
-            // Update Artwork with accent stroke or tinted fallback
+            // Update Next button tint with dynamic accent color
+            views.setInt(R.id.widget_btn_next, "setColorFilter", accentColor)
+
+            // Update Artwork (with accent border or placeholder)
             if (artworkBitmap != null) {
                 views.setImageViewBitmap(R.id.widget_artwork, artworkBitmap)
-                views.setInt(R.id.widget_artwork, "setColorFilter", 0)
             } else {
-                views.setImageViewResource(R.id.widget_artwork, R.drawable.ic_widget_music_note)
-                views.setInt(R.id.widget_artwork, "setColorFilter", accentColor)
+                val placeholder = createPlaceholderBitmap(context, 160, accentColor)
+                views.setImageViewBitmap(R.id.widget_artwork, placeholder)
             }
 
-            // Update Progress with dynamic accent tint
+            // Update Progress
             val progress = if (playbackState.duration > 0) {
                 ((playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()) * 1000)
                     .toInt()
@@ -235,57 +259,80 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
             }
             views.setProgressBar(R.id.widget_progress, 1000, progress, false)
 
+            // Apply accent wash to progress bar on Android 12+ (API 31+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val progressTint = if (song != null) {
-                    ColorUtils.setAlphaComponent(accentColor, 0x4D)
-                } else {
-                    0x26818CF8.toInt()
+                try {
+                    val progressWash = ColorUtils.setAlphaComponent(accentColor, 0x38) // ~22% opacity
+                    views.setColorStateList(
+                        R.id.widget_progress,
+                        "setProgressTintList",
+                        ColorStateList.valueOf(progressWash)
+                    )
+                } catch (e: Throwable) {
+                    Log.w(TAG, "Failed to set progress tint on widget: ${e.message}")
                 }
-                views.setColorStateList(
-                    R.id.widget_progress,
-                    "setProgressTintList",
-                    ColorStateList.valueOf(progressTint)
-                )
-
-                val ambientTint = if (song != null) {
-                    ColorUtils.setAlphaComponent(accentColor, 0x1E)
-                } else {
-                    android.graphics.Color.TRANSPARENT
-                }
-                views.setColorStateList(
-                    R.id.widget_ambient_tint,
-                    "setBackgroundTintList",
-                    ColorStateList.valueOf(ambientTint)
-                )
             }
 
             return views
         }
 
-        private suspend fun loadSongArtwork(context: Context, song: Song): Pair<Bitmap, Int>? {
-            return withContext(Dispatchers.IO) {
-                try {
-                    val imageUrl = song.mediumQualityImageUrl ?: song.highQualityImageUrl
-                    if (!imageUrl.isNullOrBlank()) {
-                        val request = ImageRequest.Builder(context)
-                            .data(imageUrl)
-                            .size(160, 160)
-                            .allowHardware(false)
-                            .build()
+        private suspend fun loadSongArtworkAndColor(
+            context: Context,
+            song: Song
+        ): Pair<Bitmap?, Int?> = withContext(Dispatchers.IO) {
+            try {
+                var cachedColor = ArtworkColorCache.get(song.id)
+                val imageUrl = song.mediumQualityImageUrl ?: song.highQualityImageUrl
+                if (!imageUrl.isNullOrBlank()) {
+                    val request = ImageRequest.Builder(context)
+                        .data(imageUrl)
+                        .size(160, 160)
+                        .allowHardware(false)
+                        .build()
 
-                        val result = context.imageLoader.execute(request)
-                        if (result is SuccessResult) {
-                            val bitmap = result.image.toBitmap()
-                            val accent = ArtworkColorExtractor.extractAccentColor(bitmap)
-                            val circularBitmap = createCircularBitmap(bitmap, 160)
-                            return@withContext Pair(circularBitmap, accent)
+                    val result = context.imageLoader.execute(request)
+                    if (result is SuccessResult) {
+                        val bitmap = result.image.toBitmap()
+                        if (cachedColor == null) {
+                            val pixels = IntArray(bitmap.width * bitmap.height)
+                            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                            val vibrantColor = ArtworkColorExtractor.extractDominantVibrantColor(pixels)
+                            cachedColor = vibrantColor.toArgb()
+                            ArtworkColorCache.put(song.id, cachedColor)
                         }
+                        return@withContext Pair(bitmap, cachedColor)
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error loading artwork for widget: ${e.message}", e)
                 }
-                null
+                Pair(null, cachedColor)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading artwork for widget: ${e.message}", e)
+                Pair(null, null)
             }
+        }
+
+        private fun createPlaceholderBitmap(context: Context, targetSize: Int, accentColor: Int): Bitmap {
+            val output = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(output)
+            val radius = targetSize / 2f
+
+            // Clean dark background circle
+            val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFF25283B.toInt()
+                style = Paint.Style.FILL
+            }
+            canvas.drawCircle(radius, radius, radius, bgPaint)
+
+            // Music note icon tinted with dynamic accent color
+            val drawable = ContextCompat.getDrawable(context, R.drawable.ic_widget_music_note)?.mutate()
+            if (drawable != null) {
+                drawable.setTint(accentColor)
+                val iconSize = (targetSize * 0.48f).toInt()
+                val offset = (targetSize - iconSize) / 2
+                drawable.setBounds(offset, offset, offset + iconSize, offset + iconSize)
+                drawable.draw(canvas)
+            }
+
+            return output
         }
 
         private fun createCircularBitmap(src: Bitmap, targetSize: Int): Bitmap {
@@ -294,12 +341,12 @@ class MusicAppWidgetProvider : AppWidgetProvider() {
                 val x = (src.width - size) / 2
                 val y = (src.height - size) / 2
                 val squared = Bitmap.createBitmap(src, x, y, size, size)
-                squared.scale(targetSize, targetSize)
+                Bitmap.createScaledBitmap(squared, targetSize, targetSize, true)
             } else {
                 src
             }
 
-            val output = createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
+            val output = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(output)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = BitmapShader(scaled, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)

@@ -7,10 +7,14 @@ import com.auvra.app.data.repository.DownloadRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,6 +24,11 @@ class StreamingCacheManager @Inject constructor(
     private val downloadRepository: DownloadRepository,
     private val okHttpClient: OkHttpClient
 ) {
+    private val downloadHttpClient by lazy {
+        okHttpClient.newBuilder()
+            .cache(null)
+            .build()
+    }
     private val cacheDir: File
         get() = File(context.cacheDir, "streaming_cache").apply {
             if (!exists()) {
@@ -66,10 +75,39 @@ class StreamingCacheManager @Inject constructor(
             return@withContext true
         }
 
-        val downloadUrl = song.highQualityDownloadUrl
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val playbackData = InnerTubeXPlayer.playerResponseForPlayback(
+            videoId = song.id,
+            audioQuality = AudioQuality.HIGH,
+            connectivityManager = cm,
+            allowBoundedRange = false,
+        ).getOrNull()
+
+        val downloadUrl = song.highQualityDownloadUrl ?: playbackData?.streamUrl
         if (downloadUrl.isNullOrEmpty()) {
-            Log.w(TAG, "cacheSong: no download URL for '${song.name}'")
+            Log.w(TAG, "cacheSong: failed to resolve stream URL for '${song.name}'")
             return@withContext false
+        }
+
+        var totalBytes = playbackData?.format?.contentLength?.takeIf { it > 0L } ?: -1L
+        if (totalBytes <= 0L) {
+            val probeRequest = Request.Builder()
+                .url(downloadUrl)
+                .header("Range", "bytes=0-0")
+                .cacheControl(CacheControl.Builder().noStore().noCache().build())
+                .apply {
+                    playbackData?.streamHeaders?.forEach { (key, value) -> header(key, value) }
+                }
+                .build()
+            try {
+                downloadHttpClient.newCall(probeRequest).execute().use { probeResponse ->
+                    val contentRange = probeResponse.header("Content-Range")
+                    val match = Regex("""bytes\s+0-0/(\d+)""", RegexOption.IGNORE_CASE).matchEntire(contentRange.orEmpty())
+                    totalBytes = match?.groupValues?.get(1)?.toLongOrNull()
+                        ?: probeResponse.header("Content-Length")?.toLongOrNull()
+                        ?: -1L
+                }
+            } catch (_: Exception) { }
         }
 
         val tempFile = File(cacheDir, "${song.id}.tmp")
@@ -78,24 +116,70 @@ class StreamingCacheManager @Inject constructor(
                 tempFile.delete()
             }
 
-            Log.d(TAG, "cacheSong: Start caching '${song.name}' from $downloadUrl")
-            val request = Request.Builder().url(downloadUrl).build()
-            val response = okHttpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                Log.w(TAG, "cacheSong: failed to download '${song.name}', HTTP ${response.code}")
-                return@withContext false
-            }
+            val chunkSize = maxOf(
+                playbackData?.rangeChunkSizeBytes ?: 0L,
+                2 * 1024 * 1024L // 2 MB chunks bypass YouTube pacing with fewer HTTP roundtrips
+            )
 
-            val body = response.body ?: return@withContext false
-            FileOutputStream(tempFile).use { output ->
-                body.byteStream().use { input ->
-                    input.copyTo(output)
+            Log.d(TAG, "cacheSong: Start caching '${song.name}' from $downloadUrl (totalBytes=$totalBytes, chunkSize=$chunkSize)")
+
+            if (totalBytes > 0L) {
+                BufferedOutputStream(FileOutputStream(tempFile), 64 * 1024).use { output ->
+                    var startByte = 0L
+                    val buffer = ByteArray(64 * 1024)
+
+                    while (startByte < totalBytes) {
+                        val endByte = minOf(startByte + chunkSize - 1, totalBytes - 1)
+                        val chunkRequest = Request.Builder()
+                            .url(downloadUrl)
+                            .header("Range", "bytes=$startByte-$endByte")
+                            .cacheControl(CacheControl.Builder().noStore().noCache().build())
+                            .apply {
+                                playbackData?.streamHeaders?.forEach { (k, v) -> header(k, v) }
+                            }
+                            .build()
+
+                        val chunkResponse = downloadHttpClient.newCall(chunkRequest).execute()
+                        if (!chunkResponse.isSuccessful && chunkResponse.code != 206) {
+                            throw IOException("Failed chunk $startByte-$endByte, HTTP ${chunkResponse.code}")
+                        }
+
+                        val chunkBody = chunkResponse.body ?: throw IOException("Empty body for chunk $startByte-$endByte")
+                        chunkBody.byteStream().use { input ->
+                            var n: Int
+                            while (input.read(buffer).also { n = it } != -1) {
+                                output.write(buffer, 0, n)
+                            }
+                        }
+                        output.flush()
+
+                        if (chunkResponse.code == 200) break
+                        startByte = endByte + 1
+                    }
+                }
+            } else {
+                val requestBuilder = Request.Builder()
+                    .url(downloadUrl)
+                    .cacheControl(CacheControl.Builder().noStore().noCache().build())
+                playbackData?.streamHeaders?.forEach { (key, value) -> requestBuilder.header(key, value) }
+
+                val response = downloadHttpClient.newCall(requestBuilder.build()).execute()
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "cacheSong: failed to download '${song.name}', HTTP ${response.code}")
+                    return@withContext false
+                }
+
+                val body = response.body ?: return@withContext false
+                BufferedOutputStream(FileOutputStream(tempFile), 64 * 1024).use { output ->
+                    BufferedInputStream(body.byteStream(), 64 * 1024).use { input ->
+                        input.copyTo(output)
+                    }
                 }
             }
 
             if (tempFile.renameTo(cacheFile)) {
                 cacheFile.setLastModified(System.currentTimeMillis())
-                Log.d(TAG, "cacheSong: Successfully cached '${song.name}'")
+                Log.d(TAG, "cacheSong: Successfully cached '${song.name}' (${cacheFile.length()} bytes)")
                 enforceCacheLimit()
                 return@withContext true
             } else {

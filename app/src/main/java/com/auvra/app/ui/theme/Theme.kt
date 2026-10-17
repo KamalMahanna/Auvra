@@ -7,20 +7,16 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
-
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.staticCompositionLocalOf
-
-val LocalDynamicThemePalette = staticCompositionLocalOf { DefaultDynamicPalette }
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
 val GlassColorScheme = darkColorScheme(
     primary = GlassPrimary,
@@ -41,47 +37,51 @@ val GlassColorScheme = darkColorScheme(
 
 @Composable
 fun AuvraTheme(
-    dynamicPalette: DynamicColorPalette = DefaultDynamicPalette,
     darkTheme: Boolean = true,
+    targetAccentColor: Color = GlassPrimary,
     content: @Composable () -> Unit
 ) {
     val animatedPrimary by animateColorAsState(
-        targetValue = dynamicPalette.primary,
+        targetValue = targetAccentColor,
         animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
-        label = "AnimatedThemePrimary"
-    )
-    val animatedPrimaryContainer by animateColorAsState(
-        targetValue = dynamicPalette.primaryContainer,
-        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
-        label = "AnimatedThemePrimaryContainer"
-    )
-    val animatedSecondary by animateColorAsState(
-        targetValue = dynamicPalette.secondary,
-        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
-        label = "AnimatedThemeSecondary"
-    )
-    val animatedTertiary by animateColorAsState(
-        targetValue = dynamicPalette.tertiary,
-        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
-        label = "AnimatedThemeTertiary"
+        label = "dynamicAccentColorAnimation"
     )
 
-    val colorScheme = GlassColorScheme.copy(
-        primary = animatedPrimary,
-        onPrimary = dynamicPalette.onPrimary,
-        primaryContainer = animatedPrimaryContainer,
-        onPrimaryContainer = dynamicPalette.onPrimaryContainer,
-        secondary = animatedSecondary,
-        tertiary = animatedTertiary
-    )
+    val primaryContainer = remember(animatedPrimary) {
+        val hsv = FloatArray(3)
+        ArtworkColorExtractor.rgbToHsv(
+            (animatedPrimary.red * 255).toInt(),
+            (animatedPrimary.green * 255).toInt(),
+            (animatedPrimary.blue * 255).toInt(),
+            hsv
+        )
+        val tunedS = (hsv[1] * 0.85f).coerceIn(0.40f, 0.90f)
+        val tunedV = 0.35f // Deep tonal container
+        ArtworkColorExtractor.hsvToColor(hsv[0], tunedS, tunedV)
+    }
+
+    val secondary = remember(animatedPrimary) {
+        shiftHue(animatedPrimary, 25f)
+    }
+
+    val tertiary = remember(animatedPrimary) {
+        shiftHue(animatedPrimary, -25f)
+    }
+
+    val colorScheme = remember(animatedPrimary, primaryContainer, secondary, tertiary) {
+        GlassColorScheme.copy(
+            primary = animatedPrimary,
+            primaryContainer = primaryContainer,
+            secondary = secondary,
+            tertiary = tertiary
+        )
+    }
 
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            @Suppress("DEPRECATION")
             window.statusBarColor = android.graphics.Color.TRANSPARENT
-            @Suppress("DEPRECATION")
             window.navigationBarColor = android.graphics.Color.TRANSPARENT
             val insetsController = WindowCompat.getInsetsController(window, view)
             insetsController.isAppearanceLightStatusBars = false
@@ -89,12 +89,23 @@ fun AuvraTheme(
         }
     }
 
-    CompositionLocalProvider(LocalDynamicThemePalette provides dynamicPalette) {
-        MaterialTheme(
-            colorScheme = colorScheme,
-            typography = Typography,
-            motionScheme = MotionScheme.expressive(),
-            content = content
-        )
-    }
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        motionScheme = MotionScheme.expressive(),
+        content = content
+    )
 }
+
+private fun shiftHue(color: Color, degrees: Float): Color {
+    val hsv = FloatArray(3)
+    ArtworkColorExtractor.rgbToHsv(
+        (color.red * 255).toInt(),
+        (color.green * 255).toInt(),
+        (color.blue * 255).toInt(),
+        hsv
+    )
+    val newHue = (hsv[0] + degrees).mod(360f)
+    return ArtworkColorExtractor.hsvToColor(newHue, hsv[1], hsv[2])
+}
+

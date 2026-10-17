@@ -1,16 +1,12 @@
 package com.auvra.app
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,12 +14,16 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
 import com.auvra.app.data.repository.DownloadRepository
 import com.auvra.app.player.MusicService
 import com.auvra.app.player.QueueManager
 import com.auvra.app.ui.navigation.AuvraNavGraph
-import com.auvra.app.ui.theme.DynamicThemeManager
 import com.auvra.app.ui.theme.AuvraTheme
+import com.auvra.app.ui.theme.DynamicThemeManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +55,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun requestStoragePermissionIfNeeded() {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+        when {
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
+                Log.d(TAG, "Storage permission already granted — triggering download scan")
+                CoroutineScope(Dispatchers.IO).launch {
+                    downloadRepository.refreshDownloadedSongs()
+                }
+            }
+            else -> {
+                Log.d(TAG, "Requesting storage permission: $permission")
+                storagePermissionLauncher.launch(permission)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val isTablet = resources.configuration.smallestScreenWidthDp >= 600
         requestedOrientation = if (isTablet) {
@@ -80,39 +101,18 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Request storage permission so the download scanner can read Music/Auvra
+        // Request storage permission so the download scanner can read/write Music/Auvra
         requestStoragePermissionIfNeeded()
 
         setContent {
-            val dynamicPalette by dynamicThemeManager.dynamicPalette.collectAsState()
-            AuvraTheme(dynamicPalette = dynamicPalette) {
+            val accentColor by dynamicThemeManager.currentAccentColor.collectAsState()
+            AuvraTheme(targetAccentColor = accentColor) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     AuvraNavGraph()
                 }
-            }
-        }
-    }
-
-    private fun requestStoragePermissionIfNeeded() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_AUDIO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-
-        when {
-            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
-                Log.d(TAG, "Storage permission already granted — triggering download scan")
-                CoroutineScope(Dispatchers.IO).launch {
-                    downloadRepository.refreshDownloadedSongs()
-                }
-            }
-            else -> {
-                Log.d(TAG, "Requesting storage permission: $permission")
-                storagePermissionLauncher.launch(permission)
             }
         }
     }

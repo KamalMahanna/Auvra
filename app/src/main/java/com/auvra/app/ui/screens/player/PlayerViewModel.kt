@@ -74,6 +74,10 @@ class PlayerViewModel @Inject constructor(
         musicPlayerManager.playSongFromQueue(songs, index)
     }
 
+    fun playDownloadedSongs(songs: List<Song>, index: Int) {
+        musicPlayerManager.playDownloadedSongs(songs, index)
+    }
+
     fun playSongWithRecommendations(song: Song) {
         musicPlayerManager.playSongWithRecommendations(song)
     }
@@ -98,9 +102,11 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun downloadSong(song: Song) {
-        viewModelScope.launch {
-            songDownloader.downloadSong(song)
-        }
+        songDownloader.enqueueDownload(song)
+    }
+
+    fun downloadSongs(songs: List<Song>) {
+        songDownloader.enqueueDownloads(songs)
     }
 
     fun isSongDownloaded(song: Song): Boolean {

@@ -3,6 +3,7 @@ package com.auvra.app.data.model
 import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.auvra.app.utils.resize
 import com.squareup.moshi.JsonClass
 
 @Immutable
@@ -69,16 +70,20 @@ data class Song(
     val downloadUrl: List<DownloadLink> = emptyList()
 ) {
     val highQualityImageUrl: String?
-        get() = image.lastOrNull()?.url
+        get() = image.find { it.quality == "1080x1080" }?.url
+            ?: image.lastOrNull()?.url?.resize(1080, 1080)
     
     val mediumQualityImageUrl: String?
-        get() = image.find { it.quality == "150x150" }?.url
-            ?: image.getOrNull(1)?.url
+        get() = image.find { it.quality == "544x544" }?.url
+            ?: image.find { it.quality == "150x150" }?.url?.resize(544, 544)
+            ?: image.getOrNull(1)?.url?.resize(544, 544)
+            ?: image.firstOrNull()?.url?.resize(544, 544)
             ?: highQualityImageUrl
 
     val lowQualityImageUrl: String?
-        get() = image.find { it.quality == "50x50" }?.url
-            ?: image.firstOrNull()?.url
+        get() = image.find { it.quality == "200x200" }?.url
+            ?: image.find { it.quality == "50x50" }?.url?.resize(200, 200)
+            ?: image.firstOrNull()?.url?.resize(200, 200)
             ?: mediumQualityImageUrl
     
     val highQualityDownloadUrl: String?
@@ -142,16 +147,20 @@ data class SearchArtist(
     val url: String = ""
 ) {
     val highQualityImageUrl: String?
-        get() = image.lastOrNull()?.url
+        get() = image.find { it.quality == "1080x1080" }?.url
+            ?: image.lastOrNull()?.url?.resize(1080, 1080)
 
     val mediumQualityImageUrl: String?
-        get() = image.find { it.quality == "150x150" }?.url
-            ?: image.getOrNull(1)?.url
+        get() = image.find { it.quality == "544x544" }?.url
+            ?: image.find { it.quality == "150x150" }?.url?.resize(544, 544)
+            ?: image.getOrNull(1)?.url?.resize(544, 544)
+            ?: image.firstOrNull()?.url?.resize(544, 544)
             ?: highQualityImageUrl
 
     val lowQualityImageUrl: String?
-        get() = image.find { it.quality == "50x50" }?.url
-            ?: image.firstOrNull()?.url
+        get() = image.find { it.quality == "200x200" }?.url
+            ?: image.find { it.quality == "50x50" }?.url?.resize(200, 200)
+            ?: image.firstOrNull()?.url?.resize(200, 200)
             ?: mediumQualityImageUrl
 }
 
@@ -173,16 +182,20 @@ data class ArtistDetail(
     val singles: List<Song>? = null
 ) {
     val highQualityImageUrl: String?
-        get() = image.lastOrNull()?.url
+        get() = image.find { it.quality == "1080x1080" }?.url
+            ?: image.lastOrNull()?.url?.resize(1080, 1080)
 
     val mediumQualityImageUrl: String?
-        get() = image.find { it.quality == "150x150" }?.url
-            ?: image.getOrNull(1)?.url
+        get() = image.find { it.quality == "544x544" }?.url
+            ?: image.find { it.quality == "150x150" }?.url?.resize(544, 544)
+            ?: image.getOrNull(1)?.url?.resize(544, 544)
+            ?: image.firstOrNull()?.url?.resize(544, 544)
             ?: highQualityImageUrl
 
     val lowQualityImageUrl: String?
-        get() = image.find { it.quality == "50x50" }?.url
-            ?: image.firstOrNull()?.url
+        get() = image.find { it.quality == "200x200" }?.url
+            ?: image.find { it.quality == "50x50" }?.url?.resize(200, 200)
+            ?: image.firstOrNull()?.url?.resize(200, 200)
             ?: mediumQualityImageUrl
 }
 
@@ -204,16 +217,20 @@ data class Album(
     val songs: List<Song>? = null
 ) {
     val highQualityImageUrl: String?
-        get() = image.lastOrNull()?.url
+        get() = image.find { it.quality == "1080x1080" }?.url
+            ?: image.lastOrNull()?.url?.resize(1080, 1080)
 
     val mediumQualityImageUrl: String?
-        get() = image.find { it.quality == "150x150" }?.url
-            ?: image.getOrNull(1)?.url
+        get() = image.find { it.quality == "544x544" }?.url
+            ?: image.find { it.quality == "150x150" }?.url?.resize(544, 544)
+            ?: image.getOrNull(1)?.url?.resize(544, 544)
+            ?: image.firstOrNull()?.url?.resize(544, 544)
             ?: highQualityImageUrl
 
     val lowQualityImageUrl: String?
-        get() = image.find { it.quality == "50x50" }?.url
-            ?: image.firstOrNull()?.url
+        get() = image.find { it.quality == "200x200" }?.url
+            ?: image.find { it.quality == "50x50" }?.url?.resize(200, 200)
+            ?: image.firstOrNull()?.url?.resize(200, 200)
             ?: mediumQualityImageUrl
 }
 
@@ -234,18 +251,61 @@ data class Playlist(
     val songs: List<Song>? = null
 ) {
     val highQualityImageUrl: String?
-        get() = image.lastOrNull()?.url
+        get() = image.find { it.quality == "1080x1080" }?.url
+            ?: image.lastOrNull()?.url?.resize(1080, 1080)
 
     val mediumQualityImageUrl: String?
-        get() = image.find { it.quality == "150x150" }?.url
-            ?: image.getOrNull(1)?.url
+        get() = image.find { it.quality == "544x544" }?.url
+            ?: image.find { it.quality == "150x150" }?.url?.resize(544, 544)
+            ?: image.getOrNull(1)?.url?.resize(544, 544)
+            ?: image.firstOrNull()?.url?.resize(544, 544)
             ?: highQualityImageUrl
 
     val lowQualityImageUrl: String?
-        get() = image.find { it.quality == "50x50" }?.url
-            ?: image.firstOrNull()?.url
+        get() = image.find { it.quality == "200x200" }?.url
+            ?: image.find { it.quality == "50x50" }?.url?.resize(200, 200)
+            ?: image.firstOrNull()?.url?.resize(200, 200)
             ?: mediumQualityImageUrl
 }
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class HomeChip(
+    val title: String = "",
+    val params: String? = null,
+    val browseId: String? = null
+)
+
+@Immutable
+data class HomeFeed(
+    val chips: List<HomeChip> = emptyList(),
+    val sections: List<ModuleSection> = emptyList(),
+    val continuation: String? = null
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class DailyDiscoverItem(
+    val seedTitle: String = "",
+    val seedArtist: String = "",
+    val song: Song
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class CommunityPlaylistItem(
+    val playlist: Playlist,
+    val previewSongs: List<Song> = emptyList()
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class MoodAndGenreItem(
+    val title: String = "",
+    val stripeColor: Long? = null,
+    val browseId: String = "",
+    val params: String? = null
+)
 
 @Immutable
 @JsonClass(generateAdapter = true)
@@ -256,20 +316,35 @@ data class ModuleItem(
     val type: String = "",
     val image: List<DownloadLink> = emptyList(),
     val url: String? = null,
-    val explicitContent: Boolean = false
+    val explicitContent: Boolean = false,
+    val duration: Int? = null,
+    val endpointBrowseId: String? = null,
+    val endpointParams: String? = null
 ) {
     val highQualityImageUrl: String?
-        get() = image.lastOrNull()?.url
+        get() = image.find { it.quality == "1080x1080" }?.url
+            ?: image.lastOrNull()?.url?.resize(1080, 1080)
 
     val mediumQualityImageUrl: String?
-        get() = image.find { it.quality == "150x150" }?.url
-            ?: image.getOrNull(1)?.url
+        get() = image.find { it.quality == "544x544" }?.url
+            ?: image.find { it.quality == "150x150" }?.url?.resize(544, 544)
+            ?: image.getOrNull(1)?.url?.resize(544, 544)
+            ?: image.firstOrNull()?.url?.resize(544, 544)
             ?: highQualityImageUrl
 
     val lowQualityImageUrl: String?
-        get() = image.find { it.quality == "50x50" }?.url
-            ?: image.firstOrNull()?.url
+        get() = image.find { it.quality == "200x200" }?.url
+            ?: image.find { it.quality == "50x50" }?.url?.resize(200, 200)
+            ?: image.firstOrNull()?.url?.resize(200, 200)
             ?: mediumQualityImageUrl
+
+    val durationFormatted: String
+        get() {
+            val d = duration ?: return ""
+            val min = d / 60
+            val sec = d % 60
+            return "%d:%02d".format(min, sec)
+        }
 }
 
 @Immutable
@@ -277,10 +352,16 @@ data class ModuleItem(
 data class ModuleSection(
     val title: String = "",
     val subtitle: String? = null,
+    val thumbnail: String? = null,
     val source: String? = null,
     val position: Int = 0,
-    val data: List<ModuleItem> = emptyList()
-)
+    val data: List<ModuleItem> = emptyList(),
+    val endpointBrowseId: String? = null,
+    val endpointParams: String? = null
+) {
+    val isSongsOnly: Boolean
+        get() = data.isNotEmpty() && data.all { it.type.lowercase().trim() == "song" }
+}
 
 @Entity(tableName = "downloaded_songs")
 @Immutable
@@ -294,6 +375,15 @@ data class DownloadedSong(
     val imageUrl: String?,
     val fileSize: Long = 0
 ) {
+    val highQualityImageUrl: String?
+        get() = imageUrl?.resize(1080, 1080)
+
+    val mediumQualityImageUrl: String?
+        get() = imageUrl?.resize(544, 544)
+
+    val lowQualityImageUrl: String?
+        get() = imageUrl?.resize(200, 200)
+
     val durationFormatted: String
         get() {
             val d = duration ?: return ""
@@ -301,28 +391,6 @@ data class DownloadedSong(
             val sec = d % 60
             return "%d:%02d".format(min, sec)
         }
-}
-
-fun DownloadedSong.toSong(): Song {
-    val artistList = artist.split(",")
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-        .map { ArtistMap(name = it) }
-
-    return Song(
-        id = id,
-        name = name,
-        url = filePath,
-        duration = duration,
-        album = SongAlbum(id = null, name = album, url = null),
-        artists = SongArtists(primary = artistList),
-        image = if (!imageUrl.isNullOrEmpty()) {
-            listOf(DownloadLink(quality = "500x500", url = imageUrl))
-        } else {
-            emptyList()
-        },
-        downloadUrl = emptyList()
-    )
 }
 
 fun String.unescapeHtml(): String {
@@ -414,4 +482,73 @@ fun ModuleSection.clean(): ModuleSection {
         data = data.map { it.clean() }
     )
 }
+
+fun DownloadedSong.toSong(): Song {
+    val normalizedImage = imageUrl?.let {
+        if (it.startsWith("/") && !it.startsWith("file://")) "file://$it" else it
+    }
+    val links = normalizedImage?.let { url ->
+        listOf(
+            DownloadLink("200x200", url.resize(200, 200)),
+            DownloadLink("544x544", url.resize(544, 544)),
+            DownloadLink("1080x1080", url.resize(1080, 1080))
+        )
+    } ?: emptyList()
+    return Song(
+        id = id,
+        name = name,
+        duration = duration,
+        artists = SongArtists(primary = listOf(ArtistMap(name = artist))),
+        image = links,
+        url = filePath
+    )
+}
+
+fun DownloadedSong.toModuleItem(): ModuleItem {
+    val normalizedImage = imageUrl?.let {
+        if (it.startsWith("/") && !it.startsWith("file://")) "file://$it" else it
+    }
+    val links = normalizedImage?.let { url ->
+        listOf(
+            DownloadLink("200x200", url.resize(200, 200)),
+            DownloadLink("544x544", url.resize(544, 544)),
+            DownloadLink("1080x1080", url.resize(1080, 1080))
+        )
+    } ?: emptyList()
+    return ModuleItem(
+        id = id,
+        name = name,
+        subtitle = artist,
+        type = "song",
+        image = links,
+        url = filePath
+    )
+}
+
+fun Song.toModuleItem(): ModuleItem = ModuleItem(
+    id = id,
+    name = name,
+    subtitle = primaryArtistNames,
+    type = "song",
+    image = image,
+    url = url
+)
+
+fun ModuleItem.toSong(): Song = Song(
+    id = id,
+    name = name,
+    duration = duration,
+    artists = SongArtists(primary = listOf(ArtistMap(name = subtitle.orEmpty()))),
+    image = image,
+    url = url.orEmpty()
+)
+
+fun Album.toModuleItem(): ModuleItem = ModuleItem(
+    id = id,
+    name = name,
+    subtitle = artists?.primary?.joinToString(", ") { it.name } ?: type,
+    type = "album",
+    image = image
+)
+
 

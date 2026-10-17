@@ -19,6 +19,12 @@ interface DownloadedSongDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDownloadedSongs(songs: List<DownloadedSong>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDownloadedSong(song: DownloadedSong)
+
     @Delete
     suspend fun deleteDownloadedSong(song: DownloadedSong)
+
+    @Query("DELETE FROM downloaded_songs WHERE filePath NOT LIKE :prefix || '%'")
+    suspend fun deleteSongsNotInDirectory(prefix: String)
 }

@@ -21,6 +21,10 @@ room = "2.6.1"
 coroutines = "1.9.0"
 jaudiotagger = "2.3.15"
 palette = "1.0.0"
+desugaring = "2.1.5"
+timber = "5.0.1"
+innertubex = "v0.5.2"
+ktor = "3.0.3"
 
 [libraries]
 androidx-palette = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
@@ -65,9 +69,21 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 jaudiotagger = { group = "com.github.AdrienPoupa", name = "jaudiotagger", version = "2.2.3" }
 
+timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+desugaring = { module = "com.android.tools:desugar_jdk_libs_nio", version.ref = "desugaring" }
+innertubex = { module = "com.github.MetrolistGroup.innertubex:innertubex", version.ref = "innertubex" }
+
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-encoding = { module = "io.ktor:ktor-client-encoding", version.ref = "ktor" }
+ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

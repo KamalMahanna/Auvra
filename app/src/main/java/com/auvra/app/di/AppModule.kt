@@ -2,7 +2,6 @@ package com.auvra.app.di
 
 import android.content.Context
 import androidx.room.Room
-import com.auvra.app.data.api.SaavnApi
 import com.auvra.app.data.local.AppDatabase
 import com.auvra.app.data.local.DownloadedSongDao
 import com.squareup.moshi.Moshi
@@ -54,27 +53,6 @@ object AppModule {
                     cachedResponse ?: throw e
                 }
             }
-            .addNetworkInterceptor { chain ->
-                val request = chain.request()
-                val response = chain.proceed(request)
-                val callParam = request.url.queryParameter("__call") ?: ""
-                
-                val (duration, unit) = when {
-                    callParam.contains("search") -> 5 to TimeUnit.MINUTES
-                    callParam.contains("getBrowseModules") -> 1 to TimeUnit.HOURS
-                    else -> 12 to TimeUnit.HOURS
-                }
-                
-                val cacheControl = CacheControl.Builder()
-                    .maxAge(duration, unit)
-                    .build()
-                
-                response.newBuilder()
-                    .header("Cache-Control", cacheControl.toString())
-                    .removeHeader("Pragma")
-                    .removeHeader("Vary") // Bypass Vary constraint to cache successfully
-                    .build()
-            }
             .build()
     }
 
@@ -97,11 +75,6 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSaavnApi(okHttpClient: OkHttpClient, moshi: Moshi): SaavnApi = 
-        com.auvra.app.data.api.SaavnApiImpl(okHttpClient, moshi)
-
-    @Provides
-    @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
         return Room.databaseBuilder(
             context,
@@ -114,5 +87,17 @@ object AppModule {
     @Singleton
     fun provideDownloadedSongDao(database: AppDatabase): DownloadedSongDao {
         return database.downloadedSongDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideHistoryDao(database: AppDatabase): com.auvra.app.data.local.HistoryDao {
+        return database.historyDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSpeedDialDao(database: AppDatabase): com.auvra.app.data.local.SpeedDialDao {
+        return database.speedDialDao()
     }
 }

@@ -32,7 +32,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -48,14 +47,28 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
-import com.auvra.app.ui.components.OfflineEmptyState
+import com.auvra.app.R
+import com.auvra.app.data.model.ModuleItem
 import com.auvra.app.ui.components.SongListItem
+import com.auvra.app.ui.screens.home.components.CommunityPlaylistCard
+import com.auvra.app.ui.screens.home.components.HomeSongItem
+import com.auvra.app.ui.screens.home.components.NavigationTitle
+import com.auvra.app.ui.screens.home.components.NewReleaseCard
+import com.auvra.app.ui.screens.home.components.RandomizeGridItem
+import com.auvra.app.ui.screens.home.components.SpeedDialGridItem
 import com.auvra.app.ui.screens.player.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,115 +80,299 @@ fun HomeScreen(
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
-    val cardSize = if (isTablet) 160.dp else 120.dp
+    val cardSize = if (isTablet) 160.dp else 125.dp
 
-    LaunchedEffect(uiState.error) {
-        val err = uiState.error
-        if (err != null && uiState.sections.isNotEmpty()) {
-            Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
-            viewModel.clearError()
-        }
-    }
+    val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
+    val playbackState by playerViewModel.playbackState.collectAsState()
+    val isPlaying = playbackState.isPlaying
 
     // Hoist sheet states so they survive recompositions and avoid animation jank on open
     val playlistSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val albumSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val artistSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    val listState = rememberLazyListState()
+
     Box(modifier = Modifier.fillMaxSize()) {
-        if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularWavyProgressIndicator()
-            }
-        } else if (uiState.error != null && uiState.sections.isEmpty()) {
-            val isNetworkErr = uiState.error?.contains("internet", ignoreCase = true) == true
-            OfflineEmptyState(
-                title = if (isNetworkErr) "No internet connection" else "Failed to load music",
-                description = if (isNetworkErr) {
-                    "Connect to Wi-Fi or mobile data to explore and stream music, or listen to your downloaded songs."
-                } else {
-                    uiState.error ?: "An unexpected error occurred. Please try again."
-                },
-                onRetry = { viewModel.retry() }
-            )
-        } else {
-            val listState = rememberLazyListState()
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = bottomPadding)
-            ) {
-                items(
-                    items = uiState.sections,
-                    key = { section -> section.title },
-                    contentType = { "section" }
-                ) { section ->
-                    Column(
-                        modifier = Modifier
-                            .animateItem()
-                            .padding(vertical = 8.dp)
-                    ) {
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = { viewModel.refresh() },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (uiState.isLoading && uiState.speedDialItems.isEmpty() && uiState.trendingSongs.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularWavyProgressIndicator()
+                }
+            } else if (uiState.error != null && uiState.speedDialItems.isEmpty() && uiState.trendingSongs.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = section.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            text = "Error: ${uiState.error}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium
                         )
-                        
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(
-                                items = section.data,
-                                key = { item -> item.id },
-                                contentType = { "module_item" }
-                            ) { item ->
-                                Column(
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = { viewModel.loadHomeFeed(forceRefresh = true) }) {
+                            Text("Retry")
+                        }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = bottomPadding)
+                ) {
+                    // 1. SPEED DIAL (Metrolist 3x3 Paged Grid with Randomize Dice button)
+                    if (uiState.speedDialItems.isNotEmpty()) {
+                        item(key = "home_speed_dial_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.speed_dial)
+                            )
+                        }
+
+                        item(key = "home_speed_dial_grid") {
+                            val targetItemSize = 160.dp
+                            val availableWidth = configuration.screenWidthDp.dp - 32.dp
+                            val columns = (availableWidth / targetItemSize).toInt().coerceAtLeast(3)
+                            val rows = if (columns >= 6) 1 else if (columns >= 4) 2 else 3
+                            val itemsPerPage = columns * rows
+                            val itemWidth = availableWidth / columns
+
+                            val pagerState = rememberPagerState(
+                                pageCount = { (uiState.speedDialItems.size + itemsPerPage - 1) / itemsPerPage }
+                            )
+
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                HorizontalPager(
+                                    state = pagerState,
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    pageSpacing = 16.dp,
                                     modifier = Modifier
-                                        .animateItem()
-                                        .width(cardSize)
-                                        .clickable {
-                                            if (item.type.lowercase().trim() == "song") {
-                                                onPlaySong()
+                                        .fillMaxWidth()
+                                        .height(itemWidth * rows)
+                                ) { page ->
+                                    val pageStartIndex = page * itemsPerPage
+                                    val pageItems = uiState.speedDialItems.drop(pageStartIndex).take(itemsPerPage)
+
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        for (row in 0 until rows) {
+                                            Row(modifier = Modifier.fillMaxWidth()) {
+                                                for (col in 0 until columns) {
+                                                    val itemIndex = row * columns + col
+                                                    val isRandomizeSlot = (page == 0 && itemIndex == itemsPerPage - 1)
+
+                                                    if (isRandomizeSlot) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .width(itemWidth)
+                                                                .height(itemWidth)
+                                                                .padding(4.dp)
+                                                        ) {
+                                                            RandomizeGridItem(
+                                                                isLoading = uiState.isRandomizing,
+                                                                onClick = {
+                                                                    viewModel.getRandomItem(onPlay = onPlaySong)
+                                                                }
+                                                            )
+                                                        }
+                                                    } else if (itemIndex < pageItems.size) {
+                                                        val item = pageItems[itemIndex]
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .width(itemWidth)
+                                                                .height(itemWidth)
+                                                                .padding(4.dp)
+                                                        ) {
+                                                            SpeedDialGridItem(
+                                                                item = item,
+                                                                isActive = item.id == currentPlayingSongId,
+                                                                isPlaying = isPlaying && item.id == currentPlayingSongId,
+                                                                onClick = {
+                                                                    if (item.type.lowercase().trim() == "song") {
+                                                                        onPlaySong()
+                                                                    }
+                                                                    viewModel.playModuleItem(item)
+                                                                },
+                                                                modifier = Modifier.fillMaxSize()
+                                                            )
+                                                        }
+                                                    } else {
+                                                        Spacer(modifier = Modifier.width(itemWidth))
+                                                    }
+                                                }
                                             }
-                                            viewModel.playModuleItem(item)
                                         }
-                                ) {
-                                    AsyncImage(
-                                        model = item.mediumQualityImageUrl,
-                                        contentDescription = item.name,
-                                        contentScale = ContentScale.Crop,
+                                    }
+                                }
+
+                                if (pagerState.pageCount > 1) {
+                                    Row(
                                         modifier = Modifier
-                                            .size(cardSize)
-                                            .clip(
-                                                if (item.type.lowercase().trim() == "artist") CircleShape else RoundedCornerShape(12.dp)
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        repeat(pagerState.pageCount) { iteration ->
+                                            val color = if (pagerState.currentPage == iteration) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(3.dp)
+                                                    .clip(CircleShape)
+                                                    .background(color)
+                                                    .size(6.dp)
                                             )
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
-                                            .border(
-                                                BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                                                if (item.type.lowercase().trim() == "artist") CircleShape else RoundedCornerShape(12.dp)
-                                            )
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = item.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    if (item.subtitle != null) {
-                                        Text(
-                                            text = item.subtitle,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(36.dp))
+                            }
+                        }
+                    }
+
+                    // 2. TRENDING SONGS FOR YOU (4-row horizontal scrolling grid with Play All)
+                    if (uiState.trendingSongs.isNotEmpty()) {
+                        item(key = "home_trending_songs_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.trending_songs_for_you),
+                                onPlayAllClick = {
+                                    viewModel.playAllSongs(uiState.trendingSongs)
+                                    onPlaySong()
+                                }
+                            )
+                        }
+
+                        item(key = "home_trending_songs_grid") {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                val rows = minOf(4, uiState.trendingSongs.size).coerceAtLeast(1)
+                                val gridHeight = 64.dp * rows
+                                LazyHorizontalGrid(
+                                    rows = GridCells.Fixed(rows),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(gridHeight),
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    items(
+                                        items = uiState.trendingSongs,
+                                        key = { song -> "trending_${song.id}" }
+                                    ) { song ->
+                                        val moduleItem = ModuleItem(
+                                            id = song.id,
+                                            name = song.name,
+                                            subtitle = song.primaryArtistNames,
+                                            type = "song",
+                                            image = song.image,
+                                            url = song.url
+                                        )
+                                        HomeSongItem(
+                                            item = moduleItem,
+                                            isActive = song.id == currentPlayingSongId,
+                                            isPlaying = isPlaying && song.id == currentPlayingSongId,
+                                            onClick = {
+                                                viewModel.playSong(song)
+                                                onPlaySong()
+                                            },
+                                            modifier = Modifier.width(if (isTablet) 360.dp else 290.dp)
                                         )
                                     }
                                 }
+                                Spacer(modifier = Modifier.height(36.dp))
+                            }
+                        }
+                    }
+
+                    // 3. TRENDING COMMUNITY PLAYLIST (320x420 cards with 2x2 collage, preview songs, and actions)
+                    if (uiState.communityPlaylists.isNotEmpty()) {
+                        item(key = "home_community_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.trending_community_playlists)
+                            )
+                        }
+
+                        item(key = "home_community_row") {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    items(
+                                        items = uiState.communityPlaylists,
+                                        key = { item -> "comm_playlist_${item.playlist.id}" }
+                                    ) { item ->
+                                        CommunityPlaylistCard(
+                                            item = item,
+                                            onClick = {
+                                                viewModel.playModuleItem(
+                                                    ModuleItem(
+                                                        id = item.playlist.id,
+                                                        name = item.playlist.name,
+                                                        type = "playlist",
+                                                        image = item.playlist.image
+                                                    )
+                                                )
+                                            },
+                                            onSongClick = { song ->
+                                                viewModel.playSong(song)
+                                                onPlaySong()
+                                            },
+                                            onPlayAllClick = {
+                                                if (item.previewSongs.isNotEmpty()) {
+                                                    viewModel.playSongFromList(item.previewSongs, 0)
+                                                    onPlaySong()
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(36.dp))
+                            }
+                        }
+                    }
+
+                    // 4. NEW RELEASES (Horizontal carousel of new release albums)
+                    if (uiState.newReleases.isNotEmpty()) {
+                        item(key = "home_new_releases_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.new_releases)
+                            )
+                        }
+
+                        item(key = "home_new_releases_row") {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    items(
+                                        items = uiState.newReleases,
+                                        key = { album -> "new_rel_${album.id}" }
+                                    ) { album ->
+                                        NewReleaseCard(
+                                            album = album,
+                                            onClick = {
+                                                viewModel.openAlbum(album)
+                                            },
+                                            cardSize = if (isTablet) 180.dp else 160.dp
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(36.dp))
                             }
                         }
                     }

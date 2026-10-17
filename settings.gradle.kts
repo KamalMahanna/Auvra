@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Auvra"
 include(":app")
+include(":innertube")

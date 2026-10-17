@@ -53,6 +53,18 @@ class LibraryViewModel @Inject constructor(
                 .filter { it.isNotEmpty() }
                 .map { com.auvra.app.data.model.ArtistMap(name = it) }
 
+            val cleanPath = ds.imageUrl?.removePrefix("file://")
+            val rawArtworkPath = if (!cleanPath.isNullOrEmpty() && java.io.File(cleanPath).exists()) {
+                ds.imageUrl
+            } else {
+                downloadRepository.getArtworkFile(ds.id, java.io.File(ds.filePath).nameWithoutExtension)?.absolutePath
+                    ?: ds.imageUrl
+            }
+
+            val artworkUri = rawArtworkPath?.let {
+                if (it.startsWith("/") && !it.startsWith("file://")) "file://$it" else it
+            }
+
             Song(
                 id = ds.id,
                 name = ds.name,
@@ -61,8 +73,8 @@ class LibraryViewModel @Inject constructor(
                 artists = com.auvra.app.data.model.SongArtists(
                     primary = artistList
                 ),
-                image = if (!ds.imageUrl.isNullOrEmpty()) {
-                    listOf(com.auvra.app.data.model.DownloadLink(quality = "500x500", url = ds.imageUrl))
+                image = if (!artworkUri.isNullOrEmpty()) {
+                    listOf(com.auvra.app.data.model.DownloadLink(quality = "500x500", url = artworkUri))
                 } else {
                     emptyList()
                 },

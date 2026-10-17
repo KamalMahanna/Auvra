@@ -188,7 +188,7 @@ fun LibraryScreen(
                         focusManager.clearFocus()
                         keyboardController?.hide()
                         val originalIndex = songList.indexOfFirst { it.id == song.id }
-                        playerViewModel.playSongFromList(songList, if (originalIndex != -1) originalIndex else index)
+                        playerViewModel.playDownloadedSongs(songList, if (originalIndex != -1) originalIndex else index)
                         onPlaySong()
                     },
                     onDownloadClick = {},
