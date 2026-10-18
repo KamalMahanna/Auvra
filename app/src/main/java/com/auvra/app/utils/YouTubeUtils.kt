@@ -1,7 +1,5 @@
 package com.auvra.app.utils
 
-import kotlin.math.roundToInt
-
 private val GOOGLEUSERCONTENT_SIZE_PATTERN =
     Regex("^(https://(?:lh3|yt3)\\.googleusercontent\\.com/[^?=]+)=(?:s\\d+|w\\d+-h\\d+)[^?]*(\\?.*)?$")
 private val GGPHT_SIZE_PATTERN =

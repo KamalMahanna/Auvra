@@ -12,7 +12,6 @@ import com.auvra.app.data.model.DownloadedSong
 import com.auvra.app.data.model.Song
 import com.auvra.app.data.repository.DownloadRepository
 import com.auvra.app.utils.resize
-import com.auvra.app.player.AudioQuality
 import com.auvra.app.player.InnerTubeXPlayer
 import com.auvra.app.player.StreamingCacheManager
 import dagger.hilt.android.qualifiers.ApplicationContext

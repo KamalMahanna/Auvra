@@ -8,13 +8,6 @@ import com.squareup.moshi.JsonClass
 
 @Immutable
 @JsonClass(generateAdapter = true)
-data class ApiResponse<T>(
-    val success: Boolean,
-    val data: T?
-)
-
-@Immutable
-@JsonClass(generateAdapter = true)
 data class DownloadLink(
     val quality: String,
     val url: String

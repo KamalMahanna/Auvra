@@ -12,7 +12,6 @@ import coil3.BitmapImage
 import coil3.SingletonImageLoader
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
-import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import com.auvra.app.data.model.Song
 import dagger.hilt.android.qualifiers.ApplicationContext

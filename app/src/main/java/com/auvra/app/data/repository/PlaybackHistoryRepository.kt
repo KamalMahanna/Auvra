@@ -2,7 +2,6 @@ package com.auvra.app.data.repository
 
 import com.auvra.app.data.local.HistoryDao
 import com.auvra.app.data.local.SpeedDialDao
-import com.auvra.app.data.local.entities.PlaybackEventEntity
 import com.auvra.app.data.local.entities.SongEntity
 import com.auvra.app.data.local.entities.SpeedDialItemEntity
 import com.auvra.app.data.model.ModuleItem

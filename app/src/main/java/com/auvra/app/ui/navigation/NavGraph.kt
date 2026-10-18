@@ -77,6 +77,8 @@ import android.content.Intent
 import androidx.core.net.toUri
 import android.util.Log
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.statusBarsPadding
+import com.auvra.app.ui.components.OfflineBanner
 import com.auvra.app.ui.components.UpdateDialog
 import com.auvra.app.ui.screens.update.AppUpdateViewModel
 
@@ -279,6 +281,16 @@ fun AuvraNavGraph(
                 }
             )
         }
+
+        // Floating Offline Status Banner (at the top, over all screens and sheets)
+        val isOnline by playerViewModel.isOnline.collectAsState()
+        OfflineBanner(
+            isOnline = isOnline,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 8.dp)
+        )
     }
 }
 

@@ -1,7 +1,9 @@
 package com.auvra.app.player
 
+import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.media3.common.C
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
 
 internal data class CachedStreamUrl(
@@ -13,6 +15,7 @@ internal data class CachedStreamUrl(
     val useRangeChunks: Boolean = false,
 )
 
+@OptIn(UnstableApi::class)
 internal fun DataSpec.withResolvedStream(stream: CachedStreamUrl): DataSpec {
     val resolved =
         withUri(stream.url.toUri())

@@ -6,16 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.auvra.app.data.model.Album
 import com.auvra.app.data.model.ArtistDetail
 import com.auvra.app.data.model.CommunityPlaylistItem
-import com.auvra.app.data.model.DailyDiscoverItem
-import com.auvra.app.data.model.DownloadLink
 import com.auvra.app.data.model.DownloadedSong
 import com.auvra.app.data.model.ModuleItem
 import com.auvra.app.data.model.ModuleSection
-import com.auvra.app.data.model.MoodAndGenreItem
 import com.auvra.app.data.model.Playlist
 import com.auvra.app.data.model.Song
-import com.auvra.app.data.model.SongArtists
-import com.auvra.app.data.model.ArtistMap
 import com.auvra.app.data.model.toSong
 import com.auvra.app.data.model.toModuleItem
 import com.auvra.app.data.repository.DownloadRepository
@@ -23,7 +18,6 @@ import com.auvra.app.data.repository.MusicRepository
 import com.auvra.app.data.repository.PlaybackHistoryRepository
 import com.auvra.app.player.MusicPlayerManager
 import com.auvra.app.utils.SongDeduplicator
-import com.auvra.app.utils.resize
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -34,7 +28,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.random.Random
 
 data class HomeUiState(
     val isLoading: Boolean = false,
@@ -196,10 +189,6 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() {
         loadHomeFeed(forceRefresh = true)
-    }
-
-    fun loadMore() {
-        // Decluttered feed has fixed curated sections
     }
 
     fun openAlbum(album: Album) {
@@ -375,25 +364,6 @@ class HomeViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Error in playModuleItem", e)
                 _uiState.value = _uiState.value.copy(error = "An error occurred: ${e.message}")
-            }
-        }
-    }
-
-    fun openMoodOrGenre(item: MoodAndGenreItem) {
-        viewModelScope.launch {
-            if (item.params != null || item.browseId.isNotEmpty()) {
-                val feedResult = musicRepository.getHomeFeed(params = item.params, forceRefresh = true)
-                feedResult.onSuccess { feed ->
-                    val playlistSongs = feed.sections.flatMap { it.data }.filter { it.type.lowercase().trim() == "song" }.map { it.toSong() }
-                    if (playlistSongs.isNotEmpty()) {
-                        val pseudoPlaylist = Playlist(
-                            id = item.browseId,
-                            name = item.title,
-                            songs = playlistSongs
-                        )
-                        _uiState.value = _uiState.value.copy(selectedPlaylist = pseudoPlaylist)
-                    }
-                }
             }
         }
     }
