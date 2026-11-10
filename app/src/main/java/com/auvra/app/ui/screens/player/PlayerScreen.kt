@@ -67,6 +67,8 @@ import com.auvra.app.ui.components.ArtworkMeshBackdrop
 import com.auvra.app.ui.components.FullArtworkBlurBackdrop
 import com.auvra.app.ui.components.SongListItem
 import com.auvra.app.ui.components.ThinSlider
+import com.auvra.app.ui.components.MarqueeText
+import com.auvra.app.ui.components.MARQUEE_ARTIST_STAGGER_MS
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.painterResource
@@ -398,6 +400,8 @@ fun PlayerScreen(
                                         .widthIn(max = PLAYER_MAX_WIDTH)
                                         .padding(horizontal = PLAYER_GUTTER)
                                 ) {
+                                    Spacer(modifier = Modifier.weight(1f))
+
                                     // Song Title & Artist Info
                                     AnimatedContent(
                                         targetState = song,
@@ -421,42 +425,38 @@ fun PlayerScreen(
                                         label = "SongTextTransition",
                                         modifier = Modifier.fillMaxWidth()
                                     ) { currentSong ->
+                                        var titleOverflowing by remember(currentSong.id) { mutableStateOf(false) }
                                         Row(
-                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                            modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(
+                                                MarqueeText(
                                                     text = currentSong.name,
                                                     style = MaterialTheme.typography.headlineMedium.copy(
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 24.sp
                                                     ),
                                                     color = Color.White,
-                                                    maxLines = 1,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .basicMarquee(
-                                                            iterations = Int.MAX_VALUE,
-                                                            spacing = MarqueeSpacing(48.dp)
-                                                        )
+                                                    onOverflowChange = { titleOverflowing = it },
+                                                    modifier = Modifier.fillMaxWidth()
                                                 )
                                                 Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
+                                                MarqueeText(
                                                     text = currentSong.primaryArtistNames,
                                                     style = MaterialTheme.typography.titleMedium.copy(
                                                         fontWeight = FontWeight.Medium,
                                                         fontSize = 18.sp
                                                     ),
                                                     color = Color.White.copy(alpha = 0.55f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
+                                                    startDelayMillis = if (titleOverflowing) MARQUEE_ARTIST_STAGGER_MS else 0L,
+                                                    modifier = Modifier.fillMaxWidth()
                                                 )
                                             }
                                         }
                                     }
 
-                                    Spacer(modifier = Modifier.heightIn(min = 16.dp).weight(1f))
+                                    Spacer(modifier = Modifier.height(54.dp))
 
                                     // BitChord ThinSlider with in-line times
                                     val progress = if (playbackState.duration > 0) {
@@ -830,36 +830,32 @@ private fun TabletNowPlayingContent(
 
         Spacer(modifier = Modifier.weight(0.1f))
 
+        var titleOverflowing by remember(song.id) { mutableStateOf(false) }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
+                MarqueeText(
                     text = song.name,
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp
                     ),
                     color = Color.White,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .basicMarquee(
-                            iterations = Int.MAX_VALUE,
-                            spacing = MarqueeSpacing(48.dp)
-                        )
+                    onOverflowChange = { titleOverflowing = it },
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
+                MarqueeText(
                     text = song.primaryArtistNames,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Medium,
                         fontSize = 18.sp
                     ),
                     color = Color.White.copy(alpha = 0.55f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    startDelayMillis = if (titleOverflowing) MARQUEE_ARTIST_STAGGER_MS else 0L,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
