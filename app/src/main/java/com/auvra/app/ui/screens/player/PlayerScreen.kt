@@ -58,8 +58,12 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.shape.CircleShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.auvra.app.R
 import com.auvra.app.data.model.Song
+import com.auvra.app.ui.components.FullArtworkBlurBackdrop
 import com.auvra.app.ui.components.SongListItem
+import com.auvra.app.ui.components.ThinSlider
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.draw.blur
@@ -196,42 +200,10 @@ fun PlayerScreen(
             )
             .then(playerGestureModifier)
     ) {
-        // Fullscreen Blurred Media Art Background
-        AnimatedContent(
-            targetState = song.highQualityImageUrl,
-            transitionSpec = {
-                fadeIn(animationSpec = tween(700)) togetherWith fadeOut(animationSpec = tween(700))
-            },
-            label = "BlurredMediaArtBackground",
+        // Fullscreen Blurred Media Art Background (BitChord pre-blurred O(N) hardware sampled)
+        FullArtworkBlurBackdrop(
+            imageUrl = song.highQualityImageUrl,
             modifier = Modifier.fillMaxSize()
-        ) { imageUrl ->
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = 1.35f
-                        scaleY = 1.35f
-                    }
-                    .blur(radius = 70.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-            )
-        }
-
-        // Ambient Dark Scrim Overlay for Contrast & Artwork Colors
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.35f),
-                            Color.Black.copy(alpha = 0.60f),
-                            Color.Black.copy(alpha = 0.85f)
-                        )
-                    )
-                )
         )
 
         Column(
@@ -434,22 +406,16 @@ fun PlayerScreen(
                                     }
                                     Spacer(modifier = Modifier.height(16.dp))
 
-                                    // Progress Slider (Transitions with title)
+                                    // BitChord ThinSlider with in-line times
                                     val progress = if (playbackState.duration > 0) {
                                         playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
                                     } else 0f
 
                                     var sliderPosition by remember { mutableStateOf<Float?>(null) }
-                                    val interactionSource = remember { MutableInteractionSource() }
-                                    val sliderColors = SliderDefaults.colors(
-                                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                        thumbColor = MaterialTheme.colorScheme.primary
-                                    )
 
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         // Current position time
@@ -460,12 +426,12 @@ fun PlayerScreen(
                                         }
                                         Text(
                                             text = formatMillis(displayPositionMillis),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = Color.White.copy(alpha = 0.65f),
                                             fontWeight = FontWeight.Medium
                                         )
 
-                                        Slider(
+                                        ThinSlider(
                                             value = sliderPosition ?: progress,
                                             onValueChange = { sliderPosition = it },
                                             onValueChangeFinished = {
@@ -474,35 +440,16 @@ fun PlayerScreen(
                                                 }
                                                 sliderPosition = null
                                             },
-                                            colors = sliderColors,
-                                            interactionSource = interactionSource,
-                                            track = { sliderState ->
-                                                val density = LocalDensity.current
-                                                val strokeWidthPx = with(density) { 6.dp.toPx() }
-                                                val trackStrokeWidthPx = with(density) { 6.dp.toPx() }
-                                                LinearWavyProgressIndicator(
-                                                    progress = { sliderState.coercedValueAsFraction },
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(18.dp),
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                                    amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
-                                                    wavelength = 40.dp,
-                                                    waveSpeed = 16.dp,
-                                                    stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
-                                                    trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
-                                                )
-                                            },
-                                            thumb = {},
+                                            activeColor = Color.White.copy(alpha = 0.95f),
+                                            inactiveColor = Color.White.copy(alpha = 0.22f),
                                             modifier = Modifier.weight(1f)
                                         )
 
                                         // Total duration time
                                         Text(
                                             text = formatMillis(playbackState.duration),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = Color.White.copy(alpha = 0.65f),
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -835,16 +782,10 @@ private fun TabletNowPlayingContent(
         } else 0f
 
         var sliderPosition by remember { mutableStateOf<Float?>(null) }
-        val interactionSource = remember { MutableInteractionSource() }
-        val sliderColors = SliderDefaults.colors(
-            activeTrackColor = MaterialTheme.colorScheme.primary,
-            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-            thumbColor = MaterialTheme.colorScheme.primary
-        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Current position time
@@ -855,12 +796,12 @@ private fun TabletNowPlayingContent(
             }
             Text(
                 text = formatMillis(displayPositionMillis),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.65f),
                 fontWeight = FontWeight.Medium
             )
 
-            Slider(
+            ThinSlider(
                 value = sliderPosition ?: progress,
                 onValueChange = { sliderPosition = it },
                 onValueChangeFinished = {
@@ -869,35 +810,16 @@ private fun TabletNowPlayingContent(
                     }
                     sliderPosition = null
                 },
-                colors = sliderColors,
-                interactionSource = interactionSource,
-                track = { sliderState ->
-                    val density = LocalDensity.current
-                    val strokeWidthPx = with(density) { 6.dp.toPx() }
-                    val trackStrokeWidthPx = with(density) { 6.dp.toPx() }
-                    LinearWavyProgressIndicator(
-                        progress = { sliderState.coercedValueAsFraction },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(18.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                        amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
-                        wavelength = 40.dp,
-                        waveSpeed = 16.dp,
-                        stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
-                        trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
-                    )
-                },
-                thumb = {},
+                activeColor = Color.White.copy(alpha = 0.95f),
+                inactiveColor = Color.White.copy(alpha = 0.22f),
                 modifier = Modifier.weight(1f)
             )
 
             // Total duration time
             Text(
                 text = formatMillis(playbackState.duration),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.65f),
                 fontWeight = FontWeight.Medium
             )
         }
@@ -970,30 +892,22 @@ private fun PlaybackControls(
         label = "NextScale"
     )
 
-    val glassBorderColor = Color.White.copy(alpha = 0.20f)
-    val buttonGlassBg = Color.White.copy(alpha = 0.12f)
-    val playGlassBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-    val playBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)
-
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+        horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Glassmorphic Previous Button
+        // BitChord / Apple Music style Previous skip glyph (squashed vertically by 0.85)
         Box(
             modifier = Modifier
-                .size(width = 58.dp, height = 46.dp)
+                .size(54.dp)
                 .graphicsLayer {
                     scaleX = prevScale
                     scaleY = prevScale
                 }
-                .clip(CircleShape)
-                .background(buttonGlassBg)
-                .border(BorderStroke(1.dp, glassBorderColor), CircleShape)
                 .clickable(
                     interactionSource = prevInteractionSource,
-                    indication = LocalIndication.current,
+                    indication = null,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         onPreviousClick()
@@ -1002,59 +916,60 @@ private fun PlaybackControls(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Rounded.SkipPrevious,
+                painter = painterResource(R.drawable.ic_player_previous),
                 contentDescription = "Previous",
                 tint = Color.White,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier
+                    .size(50.dp)
+                    .graphicsLayer { scaleY = 0.85f }
             )
         }
 
-        // Glassmorphic Play/Pause Button
-        IconButton(
-            onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onPlayPauseClick()
-            },
+        // BitChord / Apple Music style Play/Pause button (72dp bold icon, 88dp touch area)
+        Box(
             modifier = Modifier
-                .size(74.dp)
+                .size(88.dp)
                 .graphicsLayer {
                     scaleX = playScale
                     scaleY = playScale
                 }
-                .clip(CircleShape)
-                .background(playGlassBg)
-                .border(BorderStroke(1.5.dp, playBorderColor), CircleShape),
-            interactionSource = playInteractionSource
+                .clickable(
+                    interactionSource = playInteractionSource,
+                    indication = null,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onPlayPauseClick()
+                    }
+                ),
+            contentAlignment = Alignment.Center
         ) {
             if (isBuffering) {
-                CircularWavyProgressIndicator(
-                    modifier = Modifier.size(36.dp),
-                    color = Color.White
+                CircularProgressIndicator(
+                    modifier = Modifier.size(38.dp),
+                    color = Color.White,
+                    strokeWidth = 3.dp
                 )
             } else {
                 Icon(
-                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = "Play/Pause",
+                    painter = painterResource(if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play),
+                    contentDescription = if (isPlaying) "Pause" else "Play",
                     tint = Color.White,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(72.dp)
                 )
             }
         }
 
-        // Glassmorphic Next Button
+        // BitChord / Apple Music style Next skip glyph (squashed vertically by 0.85)
         Box(
             modifier = Modifier
-                .size(width = 58.dp, height = 46.dp)
+                .size(54.dp)
                 .graphicsLayer {
                     scaleX = nextScale
                     scaleY = nextScale
                 }
-                .clip(CircleShape)
-                .background(buttonGlassBg)
-                .border(BorderStroke(1.dp, glassBorderColor), CircleShape)
                 .clickable(
                     interactionSource = nextInteractionSource,
-                    indication = LocalIndication.current,
+                    indication = null,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         onNextClick()
@@ -1063,10 +978,12 @@ private fun PlaybackControls(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Rounded.SkipNext,
+                painter = painterResource(R.drawable.ic_player_next),
                 contentDescription = "Next",
                 tint = Color.White,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier
+                    .size(50.dp)
+                    .graphicsLayer { scaleY = 0.85f }
             )
         }
     }
