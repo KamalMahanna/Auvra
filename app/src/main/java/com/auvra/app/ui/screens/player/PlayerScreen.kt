@@ -75,6 +75,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import kotlinx.coroutines.launch
 
+private val PLAYER_GUTTER = 30.dp
+private val PLAYER_MAX_WIDTH = 560.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
@@ -89,6 +92,8 @@ fun PlayerScreen(
 
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isCompact = isLandscape || configuration.screenHeightDp < 640
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -221,17 +226,21 @@ fun PlayerScreen(
                         .padding(horizontal = 24.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left pane: Now playing content
+                    // Left pane: Now playing content (capped at 560dp with BitChord gutter)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
+                            .widthIn(max = PLAYER_MAX_WIDTH)
+                            .padding(horizontal = PLAYER_GUTTER),
+                        contentAlignment = Alignment.Center
                     ) {
                         TabletNowPlayingContent(
                             song = song,
                             playbackState = playbackState,
                             currentIndex = currentIndex,
                             viewModel = viewModel,
+                            compact = isCompact,
                             onQueueClick = {
                                 coroutineScope.launch {
                                     if (currentIndex in queue.indices) {
@@ -321,7 +330,8 @@ fun PlayerScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 24.dp)
+                                .widthIn(max = PLAYER_MAX_WIDTH)
+                                .padding(horizontal = PLAYER_GUTTER)
                         ) {
                             // Only Artwork & Info transitions horizontally
                             AnimatedContent(
@@ -464,7 +474,8 @@ fun PlayerScreen(
                                 isBuffering = playbackState.isBuffering,
                                 onPreviousClick = { viewModel.playPrevious() },
                                 onPlayPauseClick = { viewModel.togglePlayPause() },
-                                onNextClick = { viewModel.playNext() }
+                                onNextClick = { viewModel.playNext() },
+                                compact = isCompact
                             )
 
                             Spacer(modifier = Modifier.weight(0.05f))
@@ -708,6 +719,7 @@ private fun TabletNowPlayingContent(
     playbackState: com.auvra.app.player.PlaybackState,
     currentIndex: Int,
     viewModel: PlayerViewModel,
+    compact: Boolean = false,
     onQueueClick: () -> Unit
 ) {
     var prevIndex by remember { mutableIntStateOf(currentIndex) }
@@ -831,7 +843,8 @@ private fun TabletNowPlayingContent(
             isBuffering = playbackState.isBuffering,
             onPreviousClick = { viewModel.playPrevious() },
             onPlayPauseClick = { viewModel.togglePlayPause() },
-            onNextClick = { viewModel.playNext() }
+            onNextClick = { viewModel.playNext() },
+            compact = compact
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -855,9 +868,15 @@ private fun PlaybackControls(
     onPreviousClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val haptics = LocalHapticFeedback.current
+
+    val playSize = if (compact) 58.dp else 74.dp
+    val playTouch = if (compact) 76.dp else 92.dp
+    val skipSize = if (compact) 44.dp else 53.dp
+    val skipTouch = if (compact) 44.dp else 53.dp
 
     val prevInteractionSource = remember { MutableInteractionSource() }
     val isPrevPressed by prevInteractionSource.collectIsPressedAsState()
@@ -900,7 +919,7 @@ private fun PlaybackControls(
         // BitChord / Apple Music style Previous skip glyph (squashed vertically by 0.85)
         Box(
             modifier = Modifier
-                .size(54.dp)
+                .size(skipTouch)
                 .graphicsLayer {
                     scaleX = prevScale
                     scaleY = prevScale
@@ -920,15 +939,15 @@ private fun PlaybackControls(
                 contentDescription = "Previous",
                 tint = Color.White,
                 modifier = Modifier
-                    .size(50.dp)
+                    .size(skipSize)
                     .graphicsLayer { scaleY = 0.85f }
             )
         }
 
-        // BitChord / Apple Music style Play/Pause button (72dp bold icon, 88dp touch area)
+        // BitChord / Apple Music style Play/Pause button
         Box(
             modifier = Modifier
-                .size(88.dp)
+                .size(playTouch)
                 .graphicsLayer {
                     scaleX = playScale
                     scaleY = playScale
@@ -945,7 +964,7 @@ private fun PlaybackControls(
         ) {
             if (isBuffering) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(38.dp),
+                    modifier = Modifier.size(if (compact) 30.dp else 38.dp),
                     color = Color.White,
                     strokeWidth = 3.dp
                 )
@@ -954,7 +973,7 @@ private fun PlaybackControls(
                     painter = painterResource(if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play),
                     contentDescription = if (isPlaying) "Pause" else "Play",
                     tint = Color.White,
-                    modifier = Modifier.size(72.dp)
+                    modifier = Modifier.size(playSize)
                 )
             }
         }
@@ -962,7 +981,7 @@ private fun PlaybackControls(
         // BitChord / Apple Music style Next skip glyph (squashed vertically by 0.85)
         Box(
             modifier = Modifier
-                .size(54.dp)
+                .size(skipTouch)
                 .graphicsLayer {
                     scaleX = nextScale
                     scaleY = nextScale
@@ -982,7 +1001,7 @@ private fun PlaybackControls(
                 contentDescription = "Next",
                 tint = Color.White,
                 modifier = Modifier
-                    .size(50.dp)
+                    .size(skipSize)
                     .graphicsLayer { scaleY = 0.85f }
             )
         }
