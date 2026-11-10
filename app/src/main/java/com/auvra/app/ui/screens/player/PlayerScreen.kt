@@ -46,6 +46,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.auvra.app.ui.components.artworkBottomDissolve
+import com.auvra.app.ui.components.HERO_FADE_FRACTION
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -60,9 +63,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.auvra.app.R
 import com.auvra.app.data.model.Song
+import com.auvra.app.ui.components.ArtworkMeshBackdrop
 import com.auvra.app.ui.components.FullArtworkBlurBackdrop
 import com.auvra.app.ui.components.SongListItem
 import com.auvra.app.ui.components.ThinSlider
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -110,6 +116,7 @@ fun PlayerScreen(
     val queue by viewModel.queue.collectAsState()
 
     val density = LocalDensity.current
+    var cardBottomPx by remember { mutableFloatStateOf(0f) }
     var dragOffsetX by remember { mutableFloatStateOf(0f) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
 
@@ -205,16 +212,17 @@ fun PlayerScreen(
             )
             .then(playerGestureModifier)
     ) {
-        // Fullscreen Blurred Media Art Background (BitChord pre-blurred O(N) hardware sampled)
-        FullArtworkBlurBackdrop(
+        // BitChord Apple Music / Spotify style Artwork Mesh Backdrop:
+        // Anchored at the bottom edge of the sleeve, row 0 held above, resampled mesh below.
+        // Overlaid with BitChord's 6% -> 30% ultra-light scrim (no dark veil).
+        ArtworkMeshBackdrop(
             imageUrl = song.highQualityImageUrl,
+            seam = { with(density) { (cardBottomPx * (1f - HERO_FADE_FRACTION * 0.5f)).toDp() } },
             modifier = Modifier.fillMaxSize()
         )
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding(),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (isTablet) {
@@ -222,6 +230,7 @@ fun PlayerScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .navigationBarsPadding()
                         .padding(horizontal = 24.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -241,6 +250,7 @@ fun PlayerScreen(
                             currentIndex = currentIndex,
                             viewModel = viewModel,
                             compact = isCompact,
+                            onCardPositioned = { cardBottomPx = it },
                             onQueueClick = {
                                 coroutineScope.launch {
                                     if (currentIndex in queue.indices) {
@@ -308,14 +318,17 @@ fun PlayerScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .navigationBarsPadding()
                 ) { isQueueVisible ->
                     if (isQueueVisible) {
                         // Queue View
                         QueueView(
                             viewModel = viewModel,
                             onSwipeDown = { showQueue = false },
-                            onBackClick = { showQueue = false }
+                            onBackClick = { showQueue = false },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .statusBarsPadding()
+                                .navigationBarsPadding()
                         )
                     } else {
                         // Main Player View
@@ -326,95 +339,124 @@ fun PlayerScreen(
                             prevIndex = currentIndex
                         }
 
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .widthIn(max = PLAYER_MAX_WIDTH)
-                                .padding(horizontal = PLAYER_GUTTER)
-                        ) {
-                            // Only Artwork & Info transitions horizontally
-                            AnimatedContent(
-                                targetState = song,
-                                transitionSpec = {
-                                    if (isNext) {
-                                        (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
-                                         fadeIn(animationSpec = tween(250)))
-                                            .togetherWith(
-                                                slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
-                                                fadeOut(animationSpec = tween(250))
-                                            )
-                                    } else {
-                                        (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
-                                         fadeIn(animationSpec = tween(250)))
-                                            .togetherWith(
-                                                slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
-                                                fadeOut(animationSpec = tween(250))
-                                            )
-                                    }
-                                },
-                                label = "SongChangeTransition",
-                                modifier = Modifier.weight(1.0f)
-                            ) { currentSong ->
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    Spacer(modifier = Modifier.weight(1f))
-
-                                    // Large Artwork Card with Floating Shadow
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .navigationBarsPadding()
+                            ) {
+                                // 1. Full-bleed edge-to-edge Artwork Banner (touching top, left, and right of display)
+                                AnimatedContent(
+                                    targetState = song,
+                                    transitionSpec = {
+                                        if (isNext) {
+                                            (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                             fadeIn(animationSpec = tween(250)))
+                                                .togetherWith(
+                                                    slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
+                                                    fadeOut(animationSpec = tween(250))
+                                                )
+                                        } else {
+                                            (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
+                                             fadeIn(animationSpec = tween(250)))
+                                                .togetherWith(
+                                                    slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                                    fadeOut(animationSpec = tween(250))
+                                                )
+                                        }
+                                    },
+                                    label = "ArtworkBannerTransition",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1f)
+                                ) { currentSong ->
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .aspectRatio(1f)
-                                            .shadow(
-                                                elevation = 32.dp,
-                                                shape = RoundedCornerShape(24.dp),
-                                                clip = false,
-                                                spotColor = Color.Black.copy(alpha = 0.75f),
-                                                ambientColor = Color.Black.copy(alpha = 0.5f)
-                                            )
-                                            .clip(RoundedCornerShape(24.dp))
+                                            .fillMaxSize()
+                                            .onGloballyPositioned { coords ->
+                                                cardBottomPx = coords.positionInRoot().y + coords.size.height
+                                            }
+                                            .artworkBottomDissolve()
                                     ) {
                                         AsyncImage(
                                             model = currentSong.highQualityImageUrl,
                                             contentDescription = "Artwork",
                                             contentScale = ContentScale.Crop,
+                                            alignment = Alignment.TopCenter,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     }
+                                }
 
-                                    Spacer(modifier = Modifier.weight(1f))
-
+                                // 2. Player Controls Container below artwork
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                        .widthIn(max = PLAYER_MAX_WIDTH)
+                                        .padding(horizontal = PLAYER_GUTTER)
+                                ) {
                                     // Song Title & Artist Info
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = currentSong.name,
-                                                style = MaterialTheme.typography.headlineMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                maxLines = 1,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .basicMarquee(
-                                                        iterations = Int.MAX_VALUE,
-                                                        spacing = MarqueeSpacing(48.dp)
+                                    AnimatedContent(
+                                        targetState = song,
+                                        transitionSpec = {
+                                            if (isNext) {
+                                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                                 fadeIn(animationSpec = tween(250)))
+                                                    .togetherWith(
+                                                        slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
+                                                        fadeOut(animationSpec = tween(250))
                                                     )
-                                            )
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                text = currentSong.primaryArtistNames,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
+                                            } else {
+                                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
+                                                 fadeIn(animationSpec = tween(250)))
+                                                    .togetherWith(
+                                                        slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                                        fadeOut(animationSpec = tween(250))
+                                                    )
+                                            }
+                                        },
+                                        label = "SongTextTransition",
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { currentSong ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = currentSong.name,
+                                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 24.sp
+                                                    ),
+                                                    color = Color.White,
+                                                    maxLines = 1,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .basicMarquee(
+                                                            iterations = Int.MAX_VALUE,
+                                                            spacing = MarqueeSpacing(48.dp)
+                                                        )
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = currentSong.primaryArtistNames,
+                                                    style = MaterialTheme.typography.titleMedium.copy(
+                                                        fontWeight = FontWeight.Medium,
+                                                        fontSize = 18.sp
+                                                    ),
+                                                    color = Color.White.copy(alpha = 0.55f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
                                     }
-                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    Spacer(modifier = Modifier.heightIn(min = 16.dp).weight(1f))
 
                                     // BitChord ThinSlider with in-line times
                                     val progress = if (playbackState.duration > 0) {
@@ -428,7 +470,6 @@ fun PlayerScreen(
                                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // Current position time
                                         val displayPositionMillis = if (sliderPosition != null) {
                                             (sliderPosition!! * playbackState.duration).toLong()
                                         } else {
@@ -455,7 +496,6 @@ fun PlayerScreen(
                                             modifier = Modifier.weight(1f)
                                         )
 
-                                        // Total duration time
                                         Text(
                                             text = formatMillis(playbackState.duration),
                                             style = MaterialTheme.typography.labelMedium,
@@ -463,32 +503,55 @@ fun PlayerScreen(
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
+
+                                    Spacer(modifier = Modifier.height(20.dp))
+
+                                    // Controls Row (Static)
+                                    PlaybackControls(
+                                        isPlaying = playbackState.isPlaying,
+                                        isBuffering = playbackState.isBuffering,
+                                        onPreviousClick = { viewModel.playPrevious() },
+                                        onPlayPauseClick = { viewModel.togglePlayPause() },
+                                        onNextClick = { viewModel.playNext() },
+                                        compact = isCompact
+                                    )
+
+                                    Spacer(modifier = Modifier.height(20.dp))
+
+                                    BottomControlsRow(
+                                        song = song,
+                                        viewModel = viewModel,
+                                        isShuffleEnabled = isShuffleEnabled,
+                                        onShuffleClick = { viewModel.toggleShuffle() },
+                                        onQueueClick = { showQueue = true }
+                                    )
+
+                                    Spacer(modifier = Modifier.height(16.dp))
                                 }
                             }
 
-                            Spacer(modifier = Modifier.weight(0.05f))
-
-                            // Controls Row (Static)
-                            PlaybackControls(
-                                isPlaying = playbackState.isPlaying,
-                                isBuffering = playbackState.isBuffering,
-                                onPreviousClick = { viewModel.playPrevious() },
-                                onPlayPauseClick = { viewModel.togglePlayPause() },
-                                onNextClick = { viewModel.playNext() },
-                                compact = isCompact
-                            )
-
-                            Spacer(modifier = Modifier.weight(0.05f))
-
-                            BottomControlsRow(
-                                song = song,
-                                viewModel = viewModel,
-                                isShuffleEnabled = isShuffleEnabled,
-                                onShuffleClick = { viewModel.toggleShuffle() },
-                                onQueueClick = { showQueue = true }
-                            )
-
-                            Spacer(modifier = Modifier.weight(0.1f))
+                            // 3. BitChord-style top drag handle floating over top of artwork
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .statusBarsPadding()
+                                    .fillMaxWidth()
+                                    .height(36.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = onCollapse
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(38.dp)
+                                        .height(5.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(Color.White.copy(alpha = 0.45f))
+                                )
+                            }
                         }
                     }
                 }
@@ -720,7 +783,8 @@ private fun TabletNowPlayingContent(
     currentIndex: Int,
     viewModel: PlayerViewModel,
     compact: Boolean = false,
-    onQueueClick: () -> Unit
+    onQueueClick: () -> Unit,
+    onCardPositioned: (Float) -> Unit = {}
 ) {
     var prevIndex by remember { mutableIntStateOf(currentIndex) }
     val isNext = currentIndex >= prevIndex
@@ -737,18 +801,24 @@ private fun TabletNowPlayingContent(
     ) {
         Spacer(modifier = Modifier.weight(0.1f))
 
+        val artScale by animateFloatAsState(
+            targetValue = if (playbackState.isPlaying) 1f else 0.92f,
+            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+            label = "tabletArtScale"
+        )
+
         Box(
             modifier = Modifier
                 .weight(1f)
                 .aspectRatio(1f)
-                .shadow(
-                    elevation = 32.dp,
-                    shape = RoundedCornerShape(24.dp),
-                    clip = false,
-                    spotColor = Color.Black.copy(alpha = 0.75f),
-                    ambientColor = Color.Black.copy(alpha = 0.5f)
-                )
-                .clip(RoundedCornerShape(24.dp))
+                .onGloballyPositioned { coords ->
+                    onCardPositioned(coords.positionInRoot().y + coords.size.height)
+                }
+                .graphicsLayer {
+                    scaleX = artScale
+                    scaleY = artScale
+                }
+                .artworkBottomDissolve()
         ) {
             AsyncImage(
                 model = song.highQualityImageUrl,
@@ -767,8 +837,11 @@ private fun TabletNowPlayingContent(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.name,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp
+                    ),
+                    color = Color.White,
                     maxLines = 1,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -780,8 +853,11 @@ private fun TabletNowPlayingContent(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = song.primaryArtistNames,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 18.sp
+                    ),
+                    color = Color.White.copy(alpha = 0.55f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
