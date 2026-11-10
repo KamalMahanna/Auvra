@@ -23,7 +23,7 @@ jaudiotagger = "2.3.15"
 palette = "1.0.0"
 desugaring = "2.1.5"
 timber = "5.0.1"
-innertubex = "v0.5.2"
+innertubex = "v0.7.0"
 ktor = "3.0.3"
 
 [libraries]

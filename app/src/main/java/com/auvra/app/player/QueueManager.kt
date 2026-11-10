@@ -42,6 +42,7 @@ class QueueManager @Inject constructor(
 
     private val playedSongIds = mutableSetOf<String>()
     private val playedKeys = mutableSetOf<Pair<String, String>>()
+    private val sessionHistory = mutableListOf<Song>()
     private var isLoadingSuggestions = false
 
     // Downloaded Music Paging & Sliding Window state
@@ -204,7 +205,11 @@ class QueueManager @Inject constructor(
     }
 
     fun addToQueue(songs: List<Song>) {
-        val uniqueIncoming = songs.distinctBy { it.id }.filter { !playedSongIds.contains(it.id) }
+        val currentQueue = _queue.value
+        val uniqueIncoming = songs.distinctBy { it.id }.filter { incoming ->
+            !playedSongIds.contains(incoming.id) &&
+                !currentQueue.any { QueueBuilder.isSameRecording(it, incoming) }
+        }
         Log.d(TAG, "addToQueue (bulk): filtered ${songs.size} down to ${uniqueIncoming.size} new unique songs")
         if (uniqueIncoming.isNotEmpty()) {
             var updatedQueue = _queue.value + uniqueIncoming
@@ -224,6 +229,8 @@ class QueueManager @Inject constructor(
                     updatedQueue = updatedQueue.drop(trimCount)
                     updatedIndex -= trimCount
                     evicted.forEach {
+                        if (sessionHistory.size >= 50) sessionHistory.removeAt(0)
+                        sessionHistory.add(it)
                         playedSongIds.remove(it.id)
                         playedKeys.remove(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
                     }
@@ -249,6 +256,14 @@ class QueueManager @Inject constructor(
         if (isNearEnd()) {
             if (isDownloadedQueueMode) {
                 loadMoreDownloadedSongs()
+            } else {
+                saveScope.launch {
+                    try {
+                        loadMoreSuggestions()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "moveToNext: auto loadMoreSuggestions failed: ${e.message}", e)
+                    }
+                }
             }
         }
         val idx = _currentIndex.value + 1
@@ -324,19 +339,45 @@ class QueueManager @Inject constructor(
             Log.d(TAG, "loadMoreSuggestions: skipping for local song (hash ID='${current.id}')")
             return
         }
-        Log.d(TAG, "loadMoreSuggestions: triggering suggestions request for songId='${current.id}'")
+        Log.d(TAG, "loadMoreSuggestions: triggering radio suggestions for songId='${current.id}'")
         isLoadingSuggestions = true
 
         try {
-            val result = musicRepository.getSongSuggestions(current.id, 20)
-            result.onSuccess { suggestions ->
-                Log.d(TAG, "loadMoreSuggestions: successfully retrieved ${suggestions.size} suggestions")
-                addToQueue(suggestions)
-            }.onFailure { exception ->
-                Log.e(TAG, "loadMoreSuggestions: failed to fetch suggestions: ${exception.message}")
+            val currentQueue = _queue.value
+            val existing = currentQueue + sessionHistory
+            var extendedBatch: List<Song> = emptyList()
+
+            // BitChord strategy: try current song, and if its radio yields no new
+            // tracks, walk backwards through recent history up to 3 songs back.
+            val currentPos = _currentIndex.value
+            for (seedBack in 0..3) {
+                val seedIndex = currentPos - seedBack
+                val seedSong = if (seedIndex in currentQueue.indices) currentQueue[seedIndex] else current
+                if (seedSong.id.matches(Regex("^-?\\d+$"))) continue
+
+                val result = musicRepository.getSongSuggestions(seedSong.id, 20)
+                val candidates = result.getOrNull().orEmpty()
+                if (candidates.isNotEmpty()) {
+                    val extended = QueueBuilder.extend(
+                        existing = existing,
+                        candidates = candidates,
+                        limit = 10,
+                    )
+                    if (extended.isNotEmpty()) {
+                        extendedBatch = extended
+                        break
+                    }
+                }
+            }
+
+            if (extendedBatch.isNotEmpty()) {
+                Log.d(TAG, "loadMoreSuggestions: successfully retrieved ${extendedBatch.size} diverse suggestions")
+                addToQueue(extendedBatch)
+            } else {
+                Log.w(TAG, "loadMoreSuggestions: no new suggestions found across seed history")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "loadMoreSuggestions: error fetching suggestions: ${e.message}")
+            Log.e(TAG, "loadMoreSuggestions: error fetching suggestions: ${e.message}", e)
         } finally {
             isLoadingSuggestions = false
         }
