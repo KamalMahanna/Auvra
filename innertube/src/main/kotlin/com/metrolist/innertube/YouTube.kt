@@ -1687,6 +1687,23 @@ object YouTube {
                 .mapNotNull(MoodAndGenres.Companion::fromSectionListRendererContent)
         }
 
+    suspend fun browseRaw(
+        browseId: String? = null,
+        params: String? = null,
+        continuation: String? = null,
+        setLogin: Boolean = false,
+    ): Result<String> =
+        runCatching {
+            val response = innerTube.browse(
+                client = WEB_REMIX,
+                browseId = browseId,
+                params = params,
+                continuation = continuation,
+                setLogin = setLogin,
+            )
+            response.bodyAsText()
+        }
+
     suspend fun browse(
         browseId: String,
         params: String?,

@@ -1,6 +1,7 @@
 package com.auvra.app.data.repository
 
 import android.util.Log
+import com.auvra.app.data.innertube.InnertubeHomeParser
 import com.auvra.app.data.model.*
 import com.auvra.app.data.model.Album
 import com.auvra.app.utils.resize
@@ -277,19 +278,20 @@ class MusicRepository @Inject constructor() {
     }
 
     suspend fun getPlaylistById(id: String, limit: Int = 1000, forceRefresh: Boolean = false): Result<Playlist> = withContext(Dispatchers.IO) {
+        val cleanId = id.removePrefix("VL")
         if (!forceRefresh) {
-            val cached = playlistCache[id]
+            val cached = playlistCache[cleanId]
             if (cached != null) {
                 Log.d(TAG, "getPlaylistById cache hit for '${cached.name}'")
                 return@withContext Result.success(cached)
             }
         }
-        Log.d(TAG, "getPlaylistById(id='$id', limit=$limit)")
+        Log.d(TAG, "getPlaylistById(id='$cleanId', limit=$limit)")
         try {
-            val result = YouTube.playlist(id)
+            val result = YouTube.playlist(cleanId)
             result.map { page ->
                 val playlist = page.toAuvraPlaylist().clean()
-                playlistCache[id] = playlist
+                playlistCache[cleanId] = playlist
                 playlist
             }
         } catch (e: Exception) {
@@ -351,6 +353,24 @@ class MusicRepository @Inject constructor() {
         } catch (e: Exception) {
             Log.e(TAG, "getHomeFeed error: ${e.message}", e)
             Result.failure(e)
+        }
+    }
+
+    suspend fun getHomeShelves(): Result<HomeFeedData> = withContext(Dispatchers.IO) {
+        YouTube.browseRaw(browseId = "FEmusic_home").map { jsonString ->
+            InnertubeHomeParser.parseHomeJson(jsonString)
+        }
+    }
+
+    suspend fun getMoreHomeShelves(continuationToken: String): Result<HomeFeedData> = withContext(Dispatchers.IO) {
+        YouTube.browseRaw(continuation = continuationToken).map { jsonString ->
+            InnertubeHomeParser.parseHomeContinuationJson(jsonString)
+        }
+    }
+
+    suspend fun getHomeSupplementShelves(browseId: String): Result<List<HomeShelf>> = withContext(Dispatchers.IO) {
+        YouTube.browseRaw(browseId = browseId).map { jsonString ->
+            InnertubeHomeParser.parseHomeJson(jsonString).shelves
         }
     }
 
