@@ -1,129 +1,156 @@
-# Auvra
+<div align="center">
 
-<p align="center">
-  <img src="logo.png" alt="Auvra Logo" width="180" style="border-radius: 20%;"/>
-</p>
+<br/>
+<br/>
 
-**Auvra** is a high-fidelity, feature-rich music streaming and downloading application for Android. Built with a modern Android tech stack, the app integrates with an online music API to deliver seamless streaming, background audio playback with lock-screen control, high-speed offline downloads, and an adaptive Material 3 Jetpack Compose interface.
+<img src="Logo.png" alt="BitChord app icon" width="200" />
 
----
+# BitChord
 
-## 📥 Download
+### Aesthetic YouTube Music Client
 
-You can download the latest pre-compiled stable APK directly from the **GitHub Releases** section:
+<br/>
 
-* 🚀 **[Download Latest APK](https://github.com/KamalMahanna/Auvra/releases/latest)** (Includes the latest stable features)
-* 📦 **[View All Releases](https://github.com/KamalMahanna/Auvra/releases)** (For access to historical builds and changelogs)
+[![Latest release](https://img.shields.io/github/v/release/kushagrasinghx/BitChord?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/releases)
+[![License](https://img.shields.io/github/license/kushagrasinghx/BitChord?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/blob/main/LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/kushagrasinghx/BitChord/total?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/releases)
+[![Listening now](https://api.bitchord.kushagrasingh.in/api/stats/live/badge.svg)](https://api.bitchord.kushagrasingh.in/api/stats/live)
 
----
+<br/>
 
-## 🚀 Key Features
+[**Download**](#download) · [**Features**](#features) · [**Contributing**](#contributing) · [**Support**](#support) · [**Disclaimer**](#disclaimer)
 
-* **🎵 High-Quality Online Streaming:** Discover and stream millions of tracks, albums, playlists, and artists in high resolution via integrated [API client](app/src/main/java/com/auvra/app/data/api/SaavnApi.kt).
-* **📻 System-Integrated Playback:** A foreground audio service built on **AndroidX Media3 (ExoPlayer & MediaSession)**, supporting lock screen media controls, background playback, system notification integration, and audio focus handling. Implemented in [MusicService](app/src/main/java/com/auvra/app/player/MusicService.kt) and [MusicPlayerManager](app/src/main/java/com/auvra/app/player/MusicPlayerManager.kt).
-* **📥 Offline Downloads:** High-speed song downloader ([SongDownloader](app/src/main/java/com/auvra/app/download/SongDownloader.kt)) that saves files directly to the public `Music/Auvra` directory, allowing other players to index downloaded music and supporting local playback via [DownloadRepository](app/src/main/java/com/auvra/app/data/repository/DownloadRepository.kt).
-* **🔀 Smart Queue & Playback Management:** Queue persistence, shuffle, repeat-one, repeat-all, and smooth seek features, managed efficiently via [QueueManager](app/src/main/java/com/auvra/app/player/QueueManager.kt).
-* **⚡ Smart Offline Cache:** Reduces network consumption for streaming by utilizing custom network caching policies on OkHttp, along with a dedicated [StreamingCacheManager](app/src/main/java/com/auvra/app/player/StreamingCacheManager.kt).
-* **🎨 Responsive Jetpack Compose UI:** Premium design with glassmorphism, dynamic animations, modern color schemes, and seamless layout transitions.
-* **📱 Adaptive Layouts:** Adapts to multiple screen form factors: uses a bottom navigation bar on phones and an elegant navigation rail on tablets or foldables ([NavGraph.kt](app/src/main/java/com/auvra/app/ui/navigation/NavGraph.kt)).
+<br/>
 
----
+<a href="https://fmhy.net/mobile#youtube-music" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/available/fmhy/cozy.svg" alt="Featured on FMHY" height="55"/></a>
+<a href="https://trendshift.io/repositories/177639?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-177639" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/177639" alt="kushagrasinghx%2FBitChord | Trendshift" width="250" height="55"/></a>
 
-## 🛠️ Architecture & Tech Stack
+</div>
 
-Auvra adheres to modern Android architecture principles (**Clean Architecture** & **MVI/MVVM UI state patterns**).
-
-```mermaid
-graph TD
-    UI[Compose UI / Screens] -->|Observe State| VM[ViewModels]
-    VM -->|Call UseCases / Repositories| Repo[Repositories]
-    Repo -->|Fetch Data| API[API Client / Retrofit]
-    Repo -->|Scan Files| Local[Storage / Downloads]
-    VM -->|Control Playback| Player[MusicPlayerManager]
-    Player -->|ExoPlayer & Session| Service[Background MusicService]
-```
-
-### Technical Specs
-
-* **Minimum SDK:** 24 (Android 7.0)
-* **Target/Compile SDK:** 35 (Android 15)
-* **Language:** Kotlin (JVM Target 17)
-* **Dependency Injection:** Dagger Hilt (`@HiltAndroidApp` in [AuvraApp](app/src/main/java/com/auvra/app/AuvraApp.kt))
-* **Network:** Retrofit + OkHttp with aggressive caching rules in [AppModule](app/src/main/java/com/auvra/app/di/AppModule.kt).
-* **JSON Parsing:** Moshi + Moshi Kotlin Codegen.
-* **Image Loading:** Coil 3 featuring OkHttp integration and a robust 1GB local disk cache.
-* **Audio Engine:** AndroidX Media3 (ExoPlayer, MediaSession, MediaLibraryService).
+> [!IMPORTANT]
+> BitChord is not affiliated with, endorsed by, or connected to YouTube or Google in any way. Use it at your own discretion.
 
 ---
 
-## 📂 Project Structure Guide
+<div align="center">
 
-```
-Auvra/
-├── app/
-│   └── src/main/java/com/auvra/app/
-│       ├── MainActivity.kt        # Entry point activity initializing AuvraTheme
-│       ├── AuvraApp.kt            # Application class setting up Coil 3 and Dagger Hilt
-│       ├── data/                  # Data layer (APIs, repositories, and models)
-│       │   ├── api/               # API clients and data models
-│       │   ├── model/             # Models for Songs, Artists, Playlists
-│       │   └── repository/        # Download & Music repository interfaces
-│       ├── di/                    # Dependency Injection modules (Hilt)
-│       ├── download/              # High-speed Downloader implementing download logic
-│       ├── player/                # ExoPlayer integration, background service, queue
-│       └── ui/                    # UI layer
-│           ├── components/        # Reusable Compose widgets (MiniPlayer, indicators)
-│           ├── navigation/        # App navigation graphs and route configurations
-│           ├── screens/           # Main screen UI (Home, Library, Player, Search)
-│           └── theme/             # Design Tokens, Color Scheme, and Typography
-├── gradle/
-│   └── libs.versions.toml         # Centralized Gradle dependency catalog
-└── logo.png                       # Application launcher/branding logo
-```
+<img src="Banner.png" alt="BitChord banner" width="100%" />
 
----
+<h1><a id="features"></a>Features</h1>
 
-## 🏁 Getting Started
+<table>
+  <tr>
+    <td width="50%" valign="top">
 
-### Prerequisites
+#### Playback
+- **Search, browse and play** anything available on YouTube Music.
+- **Hi-Res lossless audio** — FLAC/ALAC from a configured module source, with YouTube Music as fallback.
+- **Gapless playback with true crossfade**, adjustable 0–12s.
+- **Automix [Beta]** — DJ-style transitions with beat-matching and tempo-stretching.
+- **Offline downloads** — save tracks with embedded metadata.
+- **Local music library** integration.
+- **Background playback** via a proper foreground media session.
+- **Apple-like lyrics animation** — credit to [binimum](https://github.com/binimum/am-lyrics).
 
-Make sure you have:
+#### Connectivity & Accounts
+- **Sign in with your Google account** for personalized content.
+- **Spotify integration** — connect your account to play your playlists and Liked Songs.
+- **Discord Rich Presence** — in-app login, live track/artist/album and progress.
+- **Scrobbling** to Last.fm and ListenBrainz.
+- **Pluggable sources** — add, edit, test and health-check module sources.
 
-1. **JDK 17** installed and configured.
-2. **Android Studio** (Ladybug or newer recommended).
-3. **Android SDK 35** installed via Android Studio SDK Manager.
+    </td>
+    <td width="50%" valign="top">
 
-### Building the Project
+#### Experience
+- **Animated album canvas** — motion artwork on the now-playing screen.
+- **Word-synced lyrics** — word/syllable-level highlighting from multiple sources.
+- **Lyrics providers** — credit to [lrc.red](https://lrc.red), [BiniLyrics](https://github.com/binimum), [BetterLyrics](https://github.com/better-lyrics/better-lyrics), [PaxSenix](https://lyrics.paxsenix.org), [LyricsPlus](https://github.com/ibratabian17/YouLyPlus), [SimpMusic](https://github.com/maxrave-dev/SimpMusic), [Unison](https://unison.boidu.dev), [Megalobiz](https://www.megalobiz.com), [KuGou](https://www.kugou.com), [LRCLIB](https://lrclib.net), [Musixmatch](https://www.musixmatch.com) and [Genius](https://genius.com).
+- **Dynamic, artwork-driven theming** — Material palette extracted from album art.
+- **Frosted-glass UI** — Telegram-style translucent bars via Haze, Material 3 theming.
 
-Clone the repository, open it in Android Studio, or compile it from the command line:
+#### Controls & Tweaks
+- **Per-network audio quality** — separate quality ceilings for Wi-Fi and mobile data.
+- **Playback speed control** (0.5×–2.0×) and **skip silence**.
+- **Sleep timer** — fixed presets or "stop after this track".
+- **System equalizer** integration.
+- **Bit-perfect USB exclusive output** — sends lossless tracks to a USB DAC unchanged, at each track's own rate and bit depth. Thanks to [Mornye](https://github.com/mornyeapp/Mornye) for the reference.
+- **Stats for nerds** — codec, bit depth, sample rate, and more on the now-playing screen.
 
-```bash
-# Clean the project build directories
-./gradlew clean
+    </td>
+  </tr>
+</table>
 
-# Build a debug APK
-./gradlew assembleDebug
-
-# Run unit tests
-./gradlew test
-```
-
-### Keystore Configuration (Release Builds)
-
-To run a release build, configure the signing details by setting the following environment variables:
-
-* `KEYSTORE_PATH`: Absolute path to your `.keystore` file.
-* `KEYSTORE_PASSWORD`: Keystore security password.
-* `KEY_ALIAS`: Key certificate alias name.
-* `KEY_PASSWORD`: Key security password.
+</div>
 
 ---
 
-## ⚖️ Disclaimer & Legal Notice
+<div align="center">
 
-This project is created strictly for **personal, educational, and research purposes**.
+<h1><a id="download"></a>Download</h1>
 
-* **No Commercial Intent:** This is a non-commercial, open-source project. It does not generate revenue, run advertisements, or charge users in any form.
-* **No Harm or Business Disruption:** There is absolutely no motive or intention to harm, disrupt, compete with, or reduce the business of any official music streaming service or API provider. It is built as a personal portfolio project demonstrating media playback integrations on Android.
-* **Copyright Ownership:** All music tracks, metadata, album artwork, and streaming media accessed through third-party endpoints are the exclusive property of their respective copyright owners and official streaming platforms. This repository does not host, store, or distribute any copyrighted media files.
-* **Terms of Use:** This software is provided "as is" without warranty of any kind. Users who run or modify this application do so at their own risk and are responsible for complying with the terms of service of any external APIs used.
+<a href="https://github.com/kushagrasinghx/BitChord/releases" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/supported/android/cozy.svg" alt="Download for Android" height="55"/></a>
+
+Grab the latest signed APK from the [Releases](https://github.com/kushagrasinghx/BitChord/releases) page. Sideloading requires enabling "Install unknown apps" for whichever app you download it with.
+
+
+</div>
+
+---
+
+<div align="center">
+
+<h1><a id="contributing"></a>Contributing</h1>
+
+We welcome contributions to BitChord! Please review our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a Pull Request.
+
+[**Contributing Guide**](CONTRIBUTING.md) · [**Code of Conduct**](CODE_OF_CONDUCT.md) · [**Maintainers**](MAINTAINERS.md) · [**Additional Docs**](ADDITIONAL.md)
+
+### Thanks to all contributors ❤
+
+<a href="https://github.com/kushagrasinghx/BitChord/graphs/contributors">
+  <img src="https://raw.githubusercontent.com/kushagrasinghx/BitChord/contributors/contributors.svg" />
+</a>
+
+</div>
+
+---
+
+<div align="center">
+
+<h1><a id="support"></a>Support</h1>
+
+BitChord is free and always will be — if it's earned a spot in your rotation, you can chip in here:
+
+<a href="https://ko-fi.com/kushagrasinghx" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/donate/kofi-singular-alt/cozy.svg" alt="Support me on Ko-fi" height="55"/></a>
+<a href="https://paypal.me/kuxhagrasingh" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/donate/paypal-plural/cozy.svg" alt="Support us on PayPal" height="55"/></a>
+
+<br/>
+<img src="upi_support.jpg" alt="UPI Support" width="250" />
+
+</div>
+
+---
+
+<div align="center">
+
+<h1><a id="disclaimer"></a>Disclaimer & Legal Notice</h1>
+
+BitChord is an independent, community-driven third-party audio player and client. It is **not** associated with Google LLC, YouTube Music, Deezer, Telegram, or any of their parent companies.
+
+* **No Media Hosting:** BitChord does not host, upload, or store copyrighted music files. It operates strictly as an interface to scan local device storage or stream media directly from public, public-facing, or user-authenticated APIs.
+* **Fair Use & API Usage:** This software is created solely for personal research, educational, and fair-use purposes. The user is entirely responsible for ensuring their usage aligns with their local copyright laws and YouTube Terms of Service.
+* **No Ad-Blocking Guarantee:** While BitChord focuses on providing a clean listening environment, it does not guarantee permanent bypasses or modifications to commercial third-party platform conditions.
+* **Copyleft:** BitChord is free software under the GPLv3. The license does not let anyone forbid others from selling or redistributing copies, but any distribution must come with the Corresponding Source under the same license.
+
+</div>
+
+---
+
+<div align="center">
+
+<h1><a id="license"></a>License</h1>
+
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See the [LICENSE](LICENSE) file for details.
+
+</div>

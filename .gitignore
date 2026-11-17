@@ -1,39 +1,52 @@
-# Build outputs
-build/
-app/build/
-
 # Gradle
 .gradle/
+.vscode/
+/build/
+/app/build/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
 
-# Kotlin cache
-.kotlin/
-
-# Local configuration
+# Local configuration file (SDK path, etc.)
 local.properties
 
-# Android Studio / IntelliJ IDEA
-.idea/
-.vscode/
+# Kotlin
+.kotlin/
 
-# External builds / Native
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+.navigation/
+captures/
 .externalNativeBuild/
 .cxx/
+*.hprof
 
-# OS-generated files
+# Log/OS files
+*.log
 .DS_Store
 Thumbs.db
 
-# Device captures
-captures/
-release.keystore
-*.keystore
+# Release signing — never commit the key or its passwords
+keystore.properties
 *.jks
-.venv
-# Added by code-review-graph
-.code-review-graph/
-.agent
+*.keystore
 
-# Temporary decompiled scratch files
-temp_decoded.kt
-temp_slider_decoded.kt
-temp_squiggly_decoded.kt
+# Project scratch / debug artifacts
+.shots/
+.tmp_verify/
+.debug/
+
+# AI agent configuration
+AGENTS.md
+/output/
+
+# Built packages — release APKs/bundles are handed out, never committed
+*.apk
+*.aab
+
+# Claude Code session files (launch configs, worktrees)
+.claude/

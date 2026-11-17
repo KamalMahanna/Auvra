@@ -1,9 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Play. Rounded rather than sharp, to sit alongside the Icons.Rounded glyphs the
+  mini player and the full player use.
+
+  The rounding is a round-joined stroke of the fill's own colour laid over an
+  inset triangle, rather than arcs written by hand: the stroke extends half its
+  width past the path and caps every corner with a radius of exactly that half,
+  so insetting the triangle by the same amount lands the finished glyph back on
+  the bounds Material's own play_arrow occupies. Hand-authored arcs would give
+  the same picture with three more chances to get a control point wrong.
+
+  White, not tinted: this only ever draws over darkened album art, so there is
+  no theme for it to follow.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="26dp"
-    android:height="26dp"
+    android:width="24dp"
+    android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M8,6.82v10.36c0,0.79 0.87,1.27 1.54,0.84l8.14,-5.18c0.62,-0.39 0.62,-1.29 0,-1.69L9.54,5.98C8.87,5.55 8,6.03 8,6.82z" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8.4,6.4L8.4,17.6L17.6,12Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2.6" />
 </vector>
