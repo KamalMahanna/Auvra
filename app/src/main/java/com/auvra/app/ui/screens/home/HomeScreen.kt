@@ -75,7 +75,6 @@ import com.auvra.app.data.model.Playlist
 import com.auvra.app.data.model.ShelfLayout
 import com.auvra.app.data.model.UiState
 import com.auvra.app.ui.components.SongListItem
-import com.auvra.app.ui.screens.home.components.HomeTitle
 import com.auvra.app.ui.screens.home.components.RecentShelf
 import com.auvra.app.ui.screens.home.components.Shelf
 import com.auvra.app.ui.screens.home.components.feedMoreSkeleton
@@ -135,12 +134,8 @@ fun HomeScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = bottomPadding)
+                contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
             ) {
-                item(key = "home_title") {
-                    HomeTitle(title = stringResource(R.string.listen_now))
-                }
-
                 when (val state = homeState) {
                     is UiState.Loading -> {
                         if (recentlyPlayedLoading) {

@@ -81,8 +81,6 @@ val VIDEO_CARD_WIDTH = 248.dp
 private const val TRACK_COLUMN_FRACTION = 0.88f
 private val TRACK_COLUMN_MAX_WIDTH = 400.dp
 private const val RECENT_TRACKS_PER_COLUMN = 4
-private const val LOGO_TO_FONT = 0.9f
-private const val LOGO_ASPECT = 730f / 484f
 
 fun trackColumnWidth(available: Dp): Dp =
     minOf(available * TRACK_COLUMN_FRACTION, TRACK_COLUMN_MAX_WIDTH)
@@ -461,31 +459,6 @@ fun Shelf(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun HomeTitle(
-    title: String = "Listen Now",
-    modifier: Modifier = Modifier,
-) {
-    val style = MaterialTheme.typography.headlineLarge
-    val logoHeight = with(LocalDensity.current) { (style.fontSize * LOGO_TO_FONT).toDp() }
-    Column(modifier = modifier.padding(horizontal = PAGE_GUTTER, vertical = 8.dp)) {
-        Icon(
-            painter = painterResource(R.drawable.ic_logo),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier
-                .padding(bottom = 14.dp)
-                .height(logoHeight)
-                .aspectRatio(LOGO_ASPECT),
-        )
-        Text(
-            text = title,
-            style = style.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onBackground,
-        )
     }
 }
 
