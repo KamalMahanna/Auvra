@@ -71,11 +71,6 @@ class WearActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lifecycle.addObserver(ambientObserver)
-        // For the watch-face icon while the phone plays. Asked once; a "no"
-        // only costs that icon — the app itself works the same.
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
-        }
         // Listening follows the screen: on while the app is visible, off the
         // moment the watch face comes back. Nothing runs in the background.
         lifecycle.addObserver(

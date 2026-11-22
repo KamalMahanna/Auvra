@@ -1378,7 +1378,6 @@
     <string name="song_info_retry">重試</string>
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
-    <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
     <string name="opened_file">已開啟的檔案</string>
     <string name="folders">資料夾</string>
     <string name="folder">資料夾</string>

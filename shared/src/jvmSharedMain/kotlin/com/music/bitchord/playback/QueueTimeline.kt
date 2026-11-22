@@ -117,24 +117,6 @@ object QueueTimeline {
             upcomingUserQueue(currentTimeline, currentIndex)
 
     /**
-     * Constructs a single-song playback timeline for Listen Together mode:
-     *
-     * Invariant: [Tapped Track (CONTEXT)] + [Upcoming manual party tracks (USER_QUEUE)].
-     * Preceding and following context tracks from the album/playlist are excluded from the shared
-     * queue, and the previous track's AutoPlay suggestions are dropped. [upcomingPartySongs] is the
-     * party's own queue after its current track, in order.
-     */
-    fun buildPartyPlaybackQueue(
-        tappedSong: Song,
-        source: QueueSource,
-        upcomingPartySongs: List<Song>,
-    ): List<Song> =
-        listOf(tappedSong.from(source).asQueueEntry(QueueTier.CONTEXT)) +
-            upcomingPartySongs
-                .filterNot { it.fromAutoplay }
-                .map { it.asQueueEntry(QueueTier.USER_QUEUE) }
-
-    /**
      * Finds the insertion index for user-queued tracks.
      *
      * Invariant:

@@ -126,23 +126,6 @@ fun TvLibraryScreen(
                     onClick = { onNavigateToDetail("local:downloads", "Downloaded", "", null, BrowseType.PLAYLIST) },
                 )
             }
-            item(key = "device") {
-                TvListRow(
-                    title = "On This Device",
-                    resting = Color.Transparent,
-                    trailingIcon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    onClick = { onNavigateToDetail("local:all", "On This Device", "", null, BrowseType.PLAYLIST) },
-                )
-            }
-            if (!signedIn) {
-                item(key = "signin") {
-                    TvListRow(
-                        title = "Sign In…",
-                        resting = Color.Transparent,
-                        onClick = onOpenAccount,
-                    )
-                }
-            }
         }
 
         Box(

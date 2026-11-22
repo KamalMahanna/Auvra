@@ -33,7 +33,6 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.media3.common.util.UnstableApi
 import com.music.bitchord.data.YtMusicRepository
-import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.settings.AppSettings
@@ -117,7 +116,7 @@ class TrackAnalyzer(private val context: Context, private val cache: AudioCache)
      * flight, rather than latched when the party starts, so joining one stops
      * the work already running instead of only the work not yet queued.
      */
-    private val stopped: Boolean get() = ListenTogether.state.value.inParty
+    private val stopped: Boolean get() = false
 
     /** The last thermal status the system reported; see [overheated]. */
     @Volatile private var thermalStatus = 0

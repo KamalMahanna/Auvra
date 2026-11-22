@@ -1,9 +1,6 @@
 package com.music.bitchord
 
 import com.music.bitchord.data.NerdStats
-import com.music.bitchord.data.jiosaavn.RawSongItem
-import com.music.bitchord.data.jiosaavn.prioritizeExplicit
-import com.music.bitchord.data.jiosaavn.selectBestSaavnStream
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.sources.DeviceCodecs
@@ -579,56 +576,15 @@ class SourcesTest {
     }
 
     @Test
-    fun `JioSaavn prioritizes the uncensored duplicate`() {
-        val clean = RawSongItem(id = "clean", title = "Starboy", explicitContent = "0")
-        val explicit = RawSongItem(id = "explicit", title = "Starboy", explicitContent = "1")
-        val anotherClean = RawSongItem(id = "clean-2", title = "Starboy", explicitContent = "0")
+    fun `YouTube is seeded and enabled on a fresh install`() {
+        val sources = SourceRegistry.sourcesForInit(emptyList())
 
-        assertEquals(
-            listOf("explicit", "clean", "clean-2"),
-            prioritizeExplicit(listOf(clean, explicit, anotherClean)).map { it.id },
-        )
+        assertEquals(listOf(SourceKind.YOUTUBE), sources.map { it.kind })
+        assertTrue(sources.single().enabled)
     }
 
     @Test
-    fun `JioSaavn accepts textual explicit flags defensively`() {
-        assertTrue(RawSongItem(explicitContent = "true").isExplicit)
-        assertFalse(RawSongItem(explicitContent = "false").isExplicit)
-        assertFalse(RawSongItem(explicitContent = "").isExplicit)
-    }
-
-    @Test
-    fun `JioSaavn is off by default on a fresh install`() {
-        assertFalse(SourceConfig(kind = SourceKind.JIOSAAVN).enabled)
-        val sources = SourceRegistry.sourcesForInit(emptyList(), forceJioSaavnOff = true)
-
-        assertFalse(sources.single { it.kind == SourceKind.JIOSAAVN }.enabled)
-        assertTrue(sources.single { it.kind == SourceKind.YOUTUBE }.enabled)
-    }
-
-    @Test
-    fun `the opt-in migration disables JioSaavn once for existing installs`() {
-        val previouslyEnabled = SourceConfig(kind = SourceKind.JIOSAAVN, enabled = true)
-
-        val migrated = SourceRegistry.sourcesForInit(
-            listOf(previouslyEnabled),
-            forceJioSaavnOff = true,
-        )
-        assertFalse(migrated.single { it.kind == SourceKind.JIOSAAVN }.enabled)
-
-        val userEnabledAgain = migrated.map {
-            if (it.kind == SourceKind.JIOSAAVN) it.copy(enabled = true) else it
-        }
-        val nextLaunch = SourceRegistry.sourcesForInit(
-            userEnabledAgain,
-            forceJioSaavnOff = false,
-        )
-        assertTrue(nextLaunch.single { it.kind == SourceKind.JIOSAAVN }.enabled)
-    }
-
-    @Test
-    fun `disabled JioSaavn and addons are excluded from the source list used by downloads`() {
-        val disabledJio = SourceConfig(kind = SourceKind.JIOSAAVN, enabled = false)
+    fun `disabled addons are excluded from the source list used by downloads`() {
         val disabledAddon = SourceConfig(
             kind = SourceKind.ADDON,
             baseUrl = "https://disabled.example",
@@ -642,33 +598,10 @@ class SourcesTest {
         val youtube = SourceConfig(kind = SourceKind.YOUTUBE)
 
         val enabled = SourceRegistry.enabledConfigs(
-            listOf(disabledJio, disabledAddon, enabledAddon, youtube),
+            listOf(disabledAddon, enabledAddon, youtube),
         )
 
         assertEquals(listOf(enabledAddon.id, youtube.id), enabled.map { it.id })
-    }
-
-    @Test
-    fun `JioSaavn upgrades a parameterized 96kbps CDN URL without losing its query`() {
-        val url = "https://aac.saavncdn.com/871/song_96.mp4?Expires=123&Signature=abc"
-
-        val selected = selectBestSaavnStream(url, supports320 = true)!!
-
-        assertEquals(
-            "https://aac.saavncdn.com/871/song_320.mp4?Expires=123&Signature=abc",
-            selected.url,
-        )
-        assertEquals(320, selected.kbps)
-    }
-
-    @Test
-    fun `JioSaavn never calls an unrecognised unchanged URL 320kbps`() {
-        val url = "https://aac.saavncdn.com/871/song.mp4?token=abc"
-
-        val selected = selectBestSaavnStream(url, supports320 = true)!!
-
-        assertEquals(url, selected.url)
-        assertNull(selected.kbps)
     }
 
     @Test
@@ -1105,20 +1038,6 @@ class SourcesTest {
     // ---- Which sources are worth asking before a track is played ------------
 
     /**
-     * Read-ahead resolves the track *after* the one playing, so a source that
-     * needs ten seconds to answer is usually still answering when the listener
-     * arrives — and a wasted module resolve costs a QuickJS engine and several
-     * backend searches, where a wasted JioSaavn one costs a round trip. Only
-     * JioSaavn earns the speculative ask.
-     */
-    @Test
-    fun `only the quick source is worth resolving ahead of playback`() {
-        assertTrue(SourceKind.JIOSAAVN.worthPrefetching)
-        assertFalse(SourceKind.MODULE.worthPrefetching)
-        assertFalse(SourceKind.CUSTOM_MODULE.worthPrefetching)
-    }
-
-    /**
      * YouTube is warmed ahead of time too, but through its own read-ahead,
      * which speaks video ids and needs no cross-source match. Marking it here
      * would send it through the substitution path to find itself.
@@ -1142,7 +1061,7 @@ class SourcesTest {
         override val displayName: String,
         private val answerAfterMs: Long,
         private val format: StreamFormat?,
-        override val kind: SourceKind = SourceKind.JIOSAAVN,
+        override val kind: SourceKind = SourceKind.ADDON,
         private val candidates: List<Song>? = null,
     ) : MusicSource {
         override val configId = displayName
@@ -1276,24 +1195,6 @@ class SourcesTest {
         val cd = song("Take on Me", "a-ha", "3:45").copy(sourceQuality = "LOSSLESS")
         val hiRes = song("Take on Me", "a-ha", "3:45").copy(sourceQuality = "LOSSLESS", sourceHiRes = true)
         assertEquals(listOf(hiRes, cd), SourceResolver.preferred(listOf(cd, hiRes), target, wantsLossless = true))
-    }
-
-    @Test
-    fun `JioSaavn substitution refuses conflicting albums without a target album`() = runBlocking {
-        val source = FakeSource(
-            displayName = "JioSaavn",
-            answerAfterMs = 0,
-            format = StreamFormat("mp4", kbps = 320),
-            candidates = listOf(
-                song("Brown Rang", "Yo Yo Honey Singh", "2:59")
-                    .copy(videoId = "international-villager", albumName = "International Villager"),
-                song("Brown Rang", "Yo Yo Honey Singh", "2:54")
-                    .copy(videoId = "chaar-ikke", albumName = "Chaar Ikke"),
-            ),
-        )
-        val target = TrackMatcher.Target("Brown Rang", "Yo Yo Honey Singh", durationSec = 175)
-
-        assertNull(SourceResolver.bestAcross(listOf(source), target, StreamRequest.Best))
     }
 
     /**

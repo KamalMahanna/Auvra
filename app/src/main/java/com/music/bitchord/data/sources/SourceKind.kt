@@ -127,16 +127,6 @@ enum class SourceKind(
         rank = 1,
     ),
 
-    JIOSAAVN(
-        label = "JioSaavn",
-        detail = "Optional JioSaavn streams up to 320kbps AAC/MP4. Catalogue matching can select the wrong song.",
-        labels = listOf("High Quality", "320kbps"),
-        needsServer = false,
-        canServeLossless = false,
-        worthPrefetching = true,
-        rank = 2,
-    ),
-
     /**
      * The source the app was built on, listed here so it always has a fixed
      * place: second, behind the module source. It cannot be removed — see
@@ -150,7 +140,7 @@ enum class SourceKind(
         labels = listOf("Lossy", "Full catalogue", "Radio"),
         needsServer = false,
         canServeLossless = false,
-        rank = 3,
+        rank = 2,
     ),
     ;
 

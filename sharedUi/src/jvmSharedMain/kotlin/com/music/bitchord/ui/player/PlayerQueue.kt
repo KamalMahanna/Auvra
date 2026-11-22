@@ -250,24 +250,17 @@ internal fun InlineQueue(
     val showHistory by PlayerSettings.showQueueHistory.collectAsStateWithLifecycle()
     val tracks = remember(queue, currentIndex, showHistory) { splitQueue(queue, currentIndex, showHistory) }
     val drag = rememberQueueDrag(listState, tracks, onMove, onDragActiveChange)
-    val nowPlaying = tracks.nowPlaying
-    val contextSong = tracks.context.firstOrNull()?.song
-    val contextTitle = contextSong?.playbackSource?.takeIf { it.isNotBlank() }
-        ?: contextSong?.albumName?.takeIf { it.isNotBlank() }
-        ?: nowPlaying?.song?.playbackSource?.takeIf { it.isNotBlank() }
-        ?: nowPlaying?.song?.albumName?.takeIf { it.isNotBlank() }
 
-    // Keep Now playing in view; history is available by scrolling upwards.
-    // Include the entry key because trimming history can leave the index unchanged.
+    // Keep upcoming tracks in view; history is available by scrolling upwards.
     var hasScrolledOnce by remember { mutableStateOf(false) }
-    LaunchedEffect(currentIndex, nowPlaying?.key, showHistory) {
-        val nowPlayingRow = if (tracks.history.isEmpty()) 0 else tracks.history.size + 1
-        val scrolledAway = listState.firstVisibleItemIndex != nowPlayingRow || listState.firstVisibleItemScrollOffset != 0
-        if (drag.held == null && nowPlaying != null && scrolledAway) {
+    LaunchedEffect(currentIndex, showHistory) {
+        val targetRow = if (tracks.history.isEmpty()) 0 else tracks.history.size + 1
+        val scrolledAway = listState.firstVisibleItemIndex != targetRow || listState.firstVisibleItemScrollOffset != 0
+        if (drag.held == null && scrolledAway) {
             if (hasScrolledOnce) {
-                listState.animateScrollToItem(nowPlayingRow)
+                listState.animateScrollToItem(targetRow)
             } else {
-                listState.scrollToItem(nowPlayingRow)
+                listState.scrollToItem(targetRow)
                 hasScrolledOnce = true
             }
         }
@@ -288,7 +281,7 @@ internal fun InlineQueue(
                 QueueClearButton(MaterialTheme.typography.titleMedium, controlsLocked, onClear)
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(16.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -323,24 +316,6 @@ internal fun InlineQueue(
                         )
                     }
                 }
-                if (nowPlaying != null) {
-                    item(key = "header-now-playing") {
-                        QueueHeading(
-                            title = stringResource(Res.string.now_playing),
-                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
-                        )
-                    }
-                    item(key = nowPlaying.key) {
-                        InlineQueueRow(
-                            song = nowPlaying.song,
-                            isCurrent = true,
-                            onClick = { onJumpTo(nowPlaying.timelineIndex) },
-                            onRemove = { onRemove(nowPlaying.timelineIndex) },
-                            locked = controlsLocked,
-                            modifier = queueMotion(),
-                        )
-                    }
-                }
                 if (tracks.user.isNotEmpty()) {
                     item(key = "header-user-queue") {
                         QueueHeading(
@@ -353,16 +328,6 @@ internal fun InlineQueue(
                     queueSection(tracks.user, QueueSection.USER, drag, controlsLocked, onJumpTo, onRemove)
                 }
                 if (tracks.context.isNotEmpty()) {
-                    item(key = "header-context") {
-                        QueueHeading(
-                            title = if (contextTitle != null) {
-                                stringResource(Res.string.next_from, contextTitle)
-                            } else {
-                                stringResource(Res.string.queue)
-                            },
-                            modifier = Modifier.padding(top = 16.dp, bottom = 6.dp).then(queueMotion()),
-                        )
-                    }
                     queueSection(tracks.context, QueueSection.CONTEXT, drag, controlsLocked, onJumpTo, onRemove)
                 }
                 if (autoplayEnabled || tracks.autoplay.isNotEmpty()) {
@@ -586,7 +551,6 @@ private class QueueDrag(private val listState: LazyListState) {
     var tracks = QueueTracks.EMPTY
     var onMove: (Int, Int) -> Unit = { _, _ -> }
 
-    /** See [PartySync.beginQueueDrag]: a jam hears about the reorder once, on drop. */
     var onActiveChange: (Boolean) -> Unit = {}
 
     /** [QUEUE_EDGE_SCROLL_ZONE] and [QUEUE_EDGE_SCROLL_SPEED], in pixels. */

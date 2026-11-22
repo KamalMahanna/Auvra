@@ -8,7 +8,6 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import com.music.bitchord.data.TrackLog
-import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,9 +52,8 @@ object MusicOnlyPlayback {
     /** Videos playing as themselves for now, because no audio version was found. */
     private val settled = MutableStateFlow<Set<String>>(emptySet())
 
-    /** Never in a party, where everyone hears the one cut — see [ListenTogether]. */
     fun isActive(): Boolean =
-        AppSettings.preferMusicOnly.value && !ListenTogether.state.value.inParty
+        AppSettings.preferMusicOnly.value
 
     /** Whether [videoId], a music video, shows its picture rather than its artwork. */
     fun showsPicture(videoId: String): Boolean = !isActive() || videoId in kept.value
@@ -95,11 +93,10 @@ object MusicOnlyPlayback {
         withTimeoutOrNull(HOLD_LIMIT_MS) {
             combine(
                 AppSettings.preferMusicOnly,
-                ListenTogether.state,
                 kept,
                 settled,
-            ) { on, party, keptNow, settledNow ->
-                !on || party.inParty || videoId in keptNow || videoId in settledNow
+            ) { on, keptNow, settledNow ->
+                !on || videoId in keptNow || videoId in settledNow
             }.first { it }
         }
     }

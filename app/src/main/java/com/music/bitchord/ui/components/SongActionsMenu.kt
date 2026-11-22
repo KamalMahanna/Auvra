@@ -63,7 +63,6 @@ import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.artworkAt
-import com.music.bitchord.data.webdav.WebDavUploads
 import com.music.bitchord.download.DownloadState
 import com.music.bitchord.download.Downloads
 import com.music.bitchord.playback.SleepTimer
@@ -108,19 +107,13 @@ fun SongActionsMenu(
     onAddToQueue: () -> Unit,
     onStartRadio: () -> Unit,
     onDownload: () -> Unit,
-    /**
-     * Copies this track to the WebDAV server. Null hides the row — the caller
-     * passes one only for a readable device file while a server is
-     * configured. Uploading while another upload of the same track runs just
-     * re-runs it; the conflict dialog keeps that idempotent.
-     */
-    onUploadToWebDav: (() -> Unit)? = null,
     onToggleLike: () -> Unit,
     onToggleDislike: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     onOpenArtist: (String) -> Unit,
     modifier: Modifier = Modifier,
+    fromPlayer: Boolean = false,
     onRemoveFromPlaylist: (() -> Unit)? = null,
     /**
      * Takes this track out of the song cache. Null hides the row — the caller
@@ -206,7 +199,7 @@ fun SongActionsMenu(
         var drawnAny = false
         fun startsGroup(): Boolean = drawnAny.also { drawnAny = true }
         val canRate = isOffline || signedIn
-        val shareAction = onShare?.takeIf { !isOffline }
+        val shareAction = onShare?.takeIf { !fromPlayer && !isOffline }
 
         // Leads with the actions it is opened for most, as tiles: the rating
         // — kept up after a tap, so the new state shows in place — and Share.
@@ -246,7 +239,7 @@ fun SongActionsMenu(
         // a substituted copy, the other for a track held on YouTube's own —
         // and between them they are the whole of the choice, which is why they
         // sit in the same group.
-        if (onRollbackToOriginal != null || onUpgradeQuality != null || onToggleAudioVersion != null) {
+        if (!fromPlayer && (onRollbackToOriginal != null || onUpgradeQuality != null || onToggleAudioVersion != null)) {
             if (startsGroup()) IosMenuSeparator()
             (onRollbackToOriginal ?: onUpgradeQuality)?.let {
                 ActionRow(
@@ -309,75 +302,78 @@ fun SongActionsMenu(
         // Where the track goes next, and what is kept of it. The file rows
         // ride in this group rather than one of their own because for a
         // device file they can all be absent, and a group may not be empty.
-        if (startsGroup()) IosMenuSeparator()
-        ActionRow(
-            icon = SfIcons.Radio,
-            label = stringResource(R.string.start_radio),
-            accent = palette.accent,
-            onClick = onStartRadio,
-        )
-        ActionRow(
-            icon = SfIcons.PlayNext,
-            label = stringResource(R.string.play_next),
-            accent = palette.accent,
-            onClick = onPlayNext,
-        )
-        ActionRow(
-            icon = SfIcons.PlayLast,
-            label = stringResource(R.string.add_to_queue),
-            accent = palette.accent,
-            onClick = onAddToQueue,
-        )
-        DownloadRow(song, palette, isOffline, onDownload)
-        onRemoveFromCache?.let {
+        if (!fromPlayer) {
+            if (startsGroup()) IosMenuSeparator()
             ActionRow(
-                icon = SfIcons.Trash,
-                label = stringResource(R.string.remove_from_cache),
+                icon = SfIcons.Radio,
+                label = stringResource(R.string.start_radio),
                 accent = palette.accent,
-                onClick = it,
+                onClick = onStartRadio,
             )
-        }
-        WebDavUploadRow(song, palette, isOffline, onUploadToWebDav)
-        onRemoveFromHistory?.let {
             ActionRow(
-                icon = SfIcons.History,
-                label = stringResource(R.string.remove_from_history),
+                icon = SfIcons.PlayNext,
+                label = stringResource(R.string.play_next),
                 accent = palette.accent,
-                onClick = it,
+                onClick = onPlayNext,
             )
+            ActionRow(
+                icon = SfIcons.PlayLast,
+                label = stringResource(R.string.add_to_queue),
+                accent = palette.accent,
+                onClick = onAddToQueue,
+            )
+            DownloadRow(song, palette, isOffline, onDownload)
+            onRemoveFromCache?.let {
+                ActionRow(
+                    icon = SfIcons.Trash,
+                    label = stringResource(R.string.remove_from_cache),
+                    accent = palette.accent,
+                    onClick = it,
+                )
+            }
+            onRemoveFromHistory?.let {
+                ActionRow(
+                    icon = SfIcons.History,
+                    label = stringResource(R.string.remove_from_history),
+                    accent = palette.accent,
+                    onClick = it,
+                )
+            }
         }
 
-        if (startsGroup()) IosMenuSeparator()
-        // Names where each one leads under it, as a menu's "Go to" does.
-        when (val id = song.albumId) {
-            null -> if (resolvingLinks) {
-                LoadingActionRow(SfIcons.Album, stringResource(R.string.open_album), palette)
+        if (!fromPlayer) {
+            if (startsGroup()) IosMenuSeparator()
+            // Names where each one leads under it, as a menu's "Go to" does.
+            when (val id = song.albumId) {
+                null -> if (resolvingLinks) {
+                    LoadingActionRow(SfIcons.Album, stringResource(R.string.open_album), palette)
+                }
+                else -> ActionRow(
+                    SfIcons.Album,
+                    stringResource(R.string.open_album),
+                    accent = palette.accent,
+                    description = song.albumName,
+                ) { onOpenAlbum(id) }
             }
-            else -> ActionRow(
-                SfIcons.Album,
-                stringResource(R.string.open_album),
-                accent = palette.accent,
-                description = song.albumName,
-            ) { onOpenAlbum(id) }
-        }
-        when (val id = song.artistId) {
-            null -> if (resolvingLinks) {
-                LoadingActionRow(SfIcons.Artist, stringResource(R.string.open_artist), palette)
+            when (val id = song.artistId) {
+                null -> if (resolvingLinks) {
+                    LoadingActionRow(SfIcons.Artist, stringResource(R.string.open_artist), palette)
+                }
+                else -> ActionRow(
+                    SfIcons.Artist,
+                    stringResource(R.string.open_artist),
+                    accent = palette.accent,
+                    description = song.artist.takeIf { it.isNotBlank() },
+                ) { onOpenArtist(id) }
             }
-            else -> ActionRow(
-                SfIcons.Artist,
-                stringResource(R.string.open_artist),
-                accent = palette.accent,
-                description = song.artist.takeIf { it.isNotBlank() },
-            ) { onOpenArtist(id) }
-        }
-        ActionRow(SfIcons.Info, stringResource(R.string.song_info), accent = palette.accent) {
-            showingSongInfo = true
+            ActionRow(SfIcons.Info, stringResource(R.string.song_info), accent = palette.accent) {
+                showingSongInfo = true
+            }
         }
 
         // The player's own: about the track playing right now rather than
         // about the song as a thing in a library.
-        if (showSleepTimer || onLyricsOffset != null || onAutomixOverview != null || onCopyLog != null) {
+        if (!fromPlayer && (showSleepTimer || onLyricsOffset != null || onAutomixOverview != null || onCopyLog != null)) {
             if (startsGroup()) IosMenuSeparator()
             if (showSleepTimer) {
                 ActionRow(
@@ -545,52 +541,6 @@ private fun DownloadRow(song: Song, palette: ArtworkPalette, isOffline: Boolean,
                 onClick = onDownload,
             )
         }
-    }
-}
-
-/**
- * Sends a device file to the WebDAV server. Sits beside the download row
- * because it is the same idea in the other direction — and like that row it
- * reads its state where it is drawn rather than threading it through the
- * menu's signature.
- *
- * Shown only for readable local files. A track already on the server, or a
- * stream with no bytes on this device, has nothing to send up.
- */
-@Composable
-private fun WebDavUploadRow(
-    song: Song,
-    palette: ArtworkPalette,
-    isOffline: Boolean,
-    onUpload: (() -> Unit)?,
-) {
-    onUpload ?: return
-    if (!isOffline || !WebDavUploads.isUploadable(song)) return
-    val active by WebDavUploads.active.collectAsStateWithLifecycle()
-    when (val state = active[song.videoId]) {
-        is WebDavUploads.TrackState.Running -> ActionRow(
-            icon = SfIcons.Upload,
-            label = stringResource(R.string.upload_to_webdav),
-            value = "${(state.fraction * 100).toInt()}%",
-            tint = palette.accent,
-            accent = palette.accent,
-            // In flight already; there is no cancel, so the row only reports.
-            onClick = {},
-        )
-        is WebDavUploads.TrackState.Failed -> ActionRow(
-            icon = SfIcons.Upload,
-            label = state.reason,
-            value = stringResource(R.string.try_again),
-            tint = MaterialTheme.colorScheme.error,
-            accent = MaterialTheme.colorScheme.error,
-            onClick = onUpload,
-        )
-        else -> ActionRow(
-            icon = SfIcons.Upload,
-            label = stringResource(R.string.upload_to_webdav),
-            accent = palette.accent,
-            onClick = onUpload,
-        )
     }
 }
 

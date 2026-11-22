@@ -63,11 +63,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.IosShare
-import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -780,8 +780,11 @@ fun NowPlayingScreen(
     autoplayEnabled: Boolean,
     signedIn: Boolean,
     accountName: String?,
-    likeStatus: LikeStatus,
-    onToggleLike: () -> Unit,
+    isDownloaded: Boolean = false,
+    onDownload: () -> Unit = {},
+    onSongInfo: () -> Unit = {},
+    likeStatus: LikeStatus = LikeStatus.INDIFFERENT,
+    onToggleLike: () -> Unit = {},
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -811,13 +814,7 @@ fun NowPlayingScreen(
     onJumpTo: (Int) -> Unit,
     onRemoveFromQueue: (Int) -> Unit,
     onMoveInQueue: (Int, Int) -> Unit,
-    /**
-     * A queue row started or stopped being dragged.
-     *
-     * Lets the caller tell a jam's party sync that a reorder is in progress, so
-     * it can hold its publish until the row is dropped instead of sending one
-     * for every neighbour the drag crosses. See [PartySync.beginQueueDrag].
-     */
+    /** A queue row started or stopped being dragged. */
     onQueueDragActiveChange: (Boolean) -> Unit = {},
     onClearQueue: () -> Unit,
     onOpenMenu: () -> Unit,
@@ -830,14 +827,6 @@ fun NowPlayingScreen(
     onOpenArtist: (browseId: String?, name: String) -> Unit,
     /** Return to the queue-level page named by the caption above the player. */
     onOpenPlaybackSource: () -> Unit,
-    /**
-     * Open Listen Together, from the party half of the output capsule.
-     *
-     * The player does not decide whether it has to get out of the way first:
-     * the settings page it opens is drawn under the player sheet, and closing
-     * the sheet is the caller's business.
-     */
-    onListenTogether: () -> Unit,
     lyrics: List<LyricLine>?,
     lyricsSource: LyricsSource?,
     lyricsProviderStates: Map<LyricsSource, LyricsProviderState>,
@@ -905,13 +894,6 @@ fun NowPlayingScreen(
     // Listening in a party whose host has taken the controls: the transport
     // keeps only play/pause, which from here moves this device alone.
     val controlsLocked = rememberControlsLocked()
-    var showListenTogetherMembers by remember { mutableStateOf(false) }
-    // Who's actually in the party is worth a look before the settings page —
-    // see [ListenTogetherMembersSheet]. Only meaningful once there is a party
-    // to show, so the pill and the caption fall back to [onListenTogether]
-    // itself (create/join) when there isn't one.
-    val openListenTogetherMembers: () -> Unit = { showListenTogetherMembers = true }
-
     val syncedLyricsEnabled by PlayerSettings.syncedLyrics.collectAsStateWithLifecycle()
     val lyricsOffsetMs by PlayerSettings.lyricsOffsetMs.collectAsStateWithLifecycle()
     // A lambda, not a value: read by the lyric strip and panel in scopes of
@@ -1126,7 +1108,7 @@ fun NowPlayingScreen(
     val overlayOpen = remember {
         derivedStateOf {
             currentMenuOpen() || showAudioPipeline || showCast || showAudioOutput || showVideoQuality ||
-                showLyricsProviders || showListenTogetherMembers || lyricsShare != null || currentLyricsOffsetOpen
+                showLyricsProviders || lyricsShare != null || currentLyricsOffsetOpen
         }
     }
     val lyricsShareEnabled = lyricsShareAvailable
@@ -1197,8 +1179,6 @@ fun NowPlayingScreen(
     PlayerBackHandler(enabled = showVideoQuality) { showVideoQuality = false }
 
     PlayerBackHandler(enabled = showLyricsProviders) { showLyricsProviders = false }
-
-    PlayerBackHandler(enabled = showListenTogetherMembers) { showListenTogetherMembers = false }
 
     PlayerBackHandler(enabled = showAudioPipeline) { showAudioPipeline = false }
 
@@ -1589,13 +1569,11 @@ fun NowPlayingScreen(
     // position into the same space as the two edges above.
     var dismissBandSpace by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
-    // Where the caption above the credits leads: the party for a track someone
-    // else queued, the queue itself for a queue-built session, and otherwise
-    // back to the album or playlist the session was started from.
+    // Where the caption above the credits leads: the queue itself for a
+    // queue-built session, and otherwise back to the album or playlist the
+    // session was started from.
     val openPlaybackOrigin: () -> Unit = {
-        if (playedBy != null) {
-            onListenTogether()
-        } else if (song.playbackSourceType == PlaybackSourceType.QUEUE) {
+        if (song.playbackSourceType == PlaybackSourceType.QUEUE) {
             queueOpen = true
             closeLyrics()
         } else {
@@ -1661,7 +1639,7 @@ fun NowPlayingScreen(
     val playerActions: @Composable () -> Unit = {
         PlayerActionRow(
             lyricsOpen = lyricsOpen,
-            queueOpen = queueOpen,
+            queueOpen = queueOpen || queueShowing,
             shuffleEnabled = shuffleEnabled,
             repeatMode = repeatMode,
             autoplayEnabled = autoplayEnabled,
@@ -1671,21 +1649,7 @@ fun NowPlayingScreen(
             onCycleRepeat = onCycleRepeat,
             onToggleAutoplay = onToggleAutoplay,
             onOpenOutput = openAudioOutput,
-            onListenTogether = onListenTogether,
-            onOpenListenTogetherMembers = openListenTogetherMembers,
         )
-        // Keep the current output caption visible in every state.
-        Spacer(Modifier.height(18.dp))
-        Box(
-            modifier = Modifier.fillMaxWidth().height(20.dp),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            OutputCaption(
-                accountName = accountName,
-                onOpenOutput = openAudioOutput,
-                onOpenMembers = openListenTogetherMembers,
-            )
-        }
     }
 
     // The drawers and dialogs the player raises over itself. Mounted beside
@@ -1727,16 +1691,6 @@ fun NowPlayingScreen(
             PlayerPlatform.host.CastDialog(
                 hazeState = playerHaze,
                 onDismiss = { showCast = false },
-            )
-        }
-        if (showListenTogetherMembers) {
-            ListenTogetherMembersSheet(
-                hazeState = playerHaze,
-                onDismiss = { showListenTogetherMembers = false },
-                onManage = {
-                    showListenTogetherMembers = false
-                    onListenTogether()
-                },
             )
         }
         if (lyricsOffsetOpen) {
@@ -2181,6 +2135,9 @@ fun NowPlayingScreen(
                                 LandscapeCredits(
                                     song = song,
                                     signedIn = signedIn,
+                                    isDownloaded = isDownloaded,
+                                    onDownload = onDownload,
+                                    onSongInfo = onSongInfo,
                                     likeStatus = likeStatus,
                                     showRevertCue = showRevertCue,
                                     onToggleLike = onToggleLike,
@@ -2269,22 +2226,6 @@ fun NowPlayingScreen(
                                         !lyricPicker.overBudget,
                                     onCancel = lyricPicker.cancel,
                                     onShare = lyricPicker.share,
-                                )
-                            },
-                            romanizationToggle = {
-                                RomanizationToggleButton(
-                                    state = lyricsTranslation.romanizationState,
-                                    showingRomanization = lyricsTranslation.showingRomanization,
-                                    enabled = !lyrics.isNullOrEmpty(),
-                                    onClick = lyricsTranslation.toggleRomanization,
-                                )
-                            },
-                            translationToggle = {
-                                TranslationToggleButton(
-                                    state = lyricsTranslation.translationState,
-                                    showingTranslation = lyricsTranslation.showingTranslation,
-                                    enabled = !lyrics.isNullOrEmpty(),
-                                    onClick = lyricsTranslation.toggleTranslation,
                                 )
                             },
                         ) { panelModifier ->
@@ -3703,7 +3644,7 @@ fun NowPlayingScreen(
                                             onOverflowChange = { titleOverflowing = it },
                                             // Only the tracks YouTube hands us a browse id for
                                             // lead anywhere; the rest stay plain text.
-                                            modifier = Modifier.opensPage(song.albumId, onOpenAlbum),
+                                            modifier = Modifier.opensPage(song.albumId, onOpenAlbum, onLongClick = onSongInfo),
                                         )
                                         ArtistCreditsMarquee(
                                             text = song.artist,
@@ -3726,66 +3667,15 @@ fun NowPlayingScreen(
                                 }
                             }
                             Spacer(Modifier.width(10.dp))
-                            // Beside the credits rather than down in the toggle row:
-                            // liking is about *this song*, and the row below is about
-                            // how the queue plays. Guests get nothing to tap, since
-                            // there's no account to record it against — except on a
-                            // local file or a finished download, whose star is the
-                            // device's own Liked playlist and needs no account.
-                            if (signedIn || song.localUri != null) {
-                                val liked = likeStatus == LikeStatus.LIKE
-                                CircleGlyph(
-                                    icon = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
-                                    contentDescription = stringResource(
-                                        if (liked) Res.string.remove_from_liked else Res.string.like,
-                                    ),
-                                    onClick = onToggleLike,
-                                    active = liked,
-                                    haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
-                                )
-                                Spacer(Modifier.width(8.dp))
-                            }
-                            // While the lyrics are up the menu glyph becomes the share
-                            // entry: the same pick mode a long-press on a line opens,
-                            // only on phones where a card can actually be made. While
-                            // picking it is the way back out again — the bar below
-                            // already holds Share.
-                            // Only once the sleeve has fully collapsed: the moment it starts
-                            // coming back the glyph is the menu again.
-                            // And only while the half player under the lyrics is tucked
-                            // away: with it up, the screen is the player again and the
-                            // glyph is its menu. A pick in progress keeps its Close
-                            // whichever way the controls are.
-                            val lyricsShareGlyphVisible = lyricsOpen && collapseDone && lyricsShareEnabled &&
-                                !lyrics.isNullOrEmpty() && (!lyricsControlsOpen || lyricPicker.picking)
                             CircleGlyph(
-                                icon = when {
-                                    showRevertCue -> Icons.AutoMirrored.Rounded.Undo
-                                    lyricsShareGlyphVisible && lyricPicker.picking -> Icons.Rounded.Close
-                                    lyricsShareGlyphVisible -> Icons.Rounded.IosShare
-                                    else -> Icons.Rounded.MoreHoriz
-                                },
+                                icon = if (isDownloaded) Icons.Rounded.DownloadDone else BitChordIcons.Download,
                                 contentDescription = stringResource(
-                                    when {
-                                        showRevertCue -> Res.string.more
-                                        lyricsShareGlyphVisible && lyricPicker.picking -> Res.string.cancel
-                                        lyricsShareGlyphVisible -> Res.string.share
-                                        else -> Res.string.more
-                                    },
+                                    if (isDownloaded) Res.string.downloaded else Res.string.download,
                                 ),
-                                onClick = when {
-                                    showRevertCue -> onOpenMenu
-                                    lyricsShareGlyphVisible && lyricPicker.picking -> lyricPicker.cancel
-                                    lyricsShareGlyphVisible -> lyricPicker.beginPicking
-                                    else -> onOpenMenu
-                                },
-                                haptic = if (lyricsShareGlyphVisible && !showRevertCue) {
-                                    Haptic.Select
-                                } else {
-                                    Haptic.Tap
-                                },
-                                modifier = Modifier.menuAnchor(),
+                                onClick = onDownload,
+                                active = isDownloaded,
                             )
+
                         }
 
                         // [lyricsOpen] asked first: a close has already hidden the
@@ -3836,51 +3726,6 @@ fun NowPlayingScreen(
                                 }
 
                             // Floated over the foot of the lyrics rather than placed in
-                            // the controls below them. In the controls it was a row of
-                            // layout like any other, and the bottom block is measured at
-                            // its natural height — so the button's 34dp came straight
-                            // off the panel above it and the lyrics lost a line. Drawn
-                            // here it costs the panel nothing and still reads as sitting
-                            // on top of the half player, because that is where it is.
-                            //
-                            // Arrives and leaves on the controls' own fade: the panel is
-                            // for reading, and a control parked over the words when
-                            // nobody asked for the controls is one more thing between
-                            // the reader and them.
-                            val translateShown = lyricsPanelVisible && lyricsControlsOpen
-                            val translateFade by animateFloatAsState(
-                                targetValue = if (translateShown) 1f else 0f,
-                                animationSpec = tween(if (translateShown) 220 else 160),
-                                label = "translateFade",
-                            )
-                            if (translateFade > 0.01f && !lyricPicker.picking) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomStart)
-                                        .graphicsLayer { alpha = translateFade },
-                                ) {
-                                    RomanizationToggleButton(
-                                        state = lyricsTranslation.romanizationState,
-                                        showingRomanization = lyricsTranslation.showingRomanization,
-                                        enabled = translateShown && !lyrics.isNullOrEmpty(),
-                                        onClick = lyricsTranslation.toggleRomanization,
-                                    )
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .graphicsLayer { alpha = translateFade },
-                                ) {
-                                    TranslationToggleButton(
-                                        state = lyricsTranslation.translationState,
-                                        showingTranslation = lyricsTranslation.showingTranslation,
-                                        // Not tappable on the way out: a disc at 20%
-                                        // opacity is on its way to gone, not a target.
-                                        enabled = translateShown && !lyrics.isNullOrEmpty(),
-                                        onClick = lyricsTranslation.toggleTranslation,
-                                    )
-                                }
-                            }
                             // The bar arrives and leaves without a transition of its own:
                             // it is an instruction over the words, and one that has to
                             // be legible the instant it is on. Anything that animated
@@ -4009,118 +3854,153 @@ fun NowPlayingScreen(
                     // loading, "not available", status and blank lines titleMedium's
                     // 24sp, taller again in Devanagari or Thai — so every track change
                     // (sung line → loading line) grew the deck and shrank the sleeve.
+                    val queueProgress: () -> Float = { queueSlide.floatValue }
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(lyricSlotHeight),
-                        contentAlignment = Alignment.CenterStart,
+                            .graphicsLayer {
+                                val progress = (1f - queueProgress()).coerceIn(0f, 1f)
+                                alpha = ((progress - 0.15f) / 0.85f).coerceIn(0f, 1f)
+                                translationY = (1f - progress) * 20.dp.toPx()
+                                clip = true
+                            }
+                            .layout { measurable, constraints ->
+                                val placeable = measurable.measure(constraints.copy(minHeight = 0))
+                                val progress = (1f - queueProgress()).coerceIn(0f, 1f)
+                                val queueGap = with(density) { 10.dp.roundToPx() }
+                                val animatedHeight = (queueGap + (placeable.height - queueGap) * progress)
+                                    .roundToInt()
+                                    .coerceIn(0, placeable.height)
+                                layout(placeable.width, animatedHeight) {
+                                    placeable.placeRelative(0, 0)
+                                }
+                            },
                     ) {
-                    if (!lyricsOpen && syncedLyricsEnabled) {
-                        CurrentLyricStrip(
-                            lines = lyricsTranslation.displayedLyrics,
-                            trackKey = song.videoId,
-                            playhead = lyricsPlayhead,
-                            isPlaying = isPlaying && position.advancing,
-                            durationMs = durationMs,
-                            lyricsUnavailable = lyricsUnavailable,
-                            loadingText = lyricsLoadingText,
-                            // Still visible over the queue, so still a valid way in:
-                            // opens the same full lyrics panel it always has, closing
-                            // the queue behind it the same way the "Up next" glyph
-                            // closes lyrics behind the queue.
-                            onClick = openLyrics,
-                        )
-                    }
-                    if (!lyricsOpen && !syncedLyricsEnabled) {
-                        Text(
-                            text = "\u00A0",
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .offset(y = 6.dp)
-                                .padding(vertical = 4.dp),
-                        )
-                    }
-                    if (lyricsOpen) {
-                        LyricsStatusWithChange(
-                            status = lyricsTranslation.status,
-                            onStatusClick = { showLyricsProviders = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .offset(y = 6.dp)
-                                .padding(vertical = 4.dp),
-                        )
-                    }
-                    }
-                    val transitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
-                    PlayerScrubber(
-                        shown = shown,
-                        durationMs = durationMs,
-                        loading = versionSwitching,
-                        mixing = mixing && !scrub.scrubbing,
-                        // Hidden while scrubbing: the planner is still describing
-                        // where the transition *would* be, and a marker sitting under
-                        // a finger that is moving the playhead invites reading it as
-                        // a drag target.
-                        transitionWindow = transitionWindow
-                            ?.takeIf { !scrub.scrubbing && it.end > it.start }
-                            ?.let { it.start..it.end },
-                        onScrub = onScrub,
-                        onScrubFinished = onScrubFinished,
-                    ) {
-                        PlaybackQualityLabel(
-                            song = song,
-                            isLoading = isLoading,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(horizontal = 8.dp),
-                        )
-                    }
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(lyricSlotHeight)
+                                    .then(
+                                        if (!lyricsOpen) {
+                                            Modifier.clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = openLyrics,
+                                            )
+                                        } else {
+                                            Modifier
+                                        }
+                                    ),
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                if (!lyricsOpen && syncedLyricsEnabled) {
+                                    CurrentLyricStrip(
+                                        lines = lyricsTranslation.displayedLyrics,
+                                        trackKey = song.videoId,
+                                        playhead = lyricsPlayhead,
+                                        isPlaying = isPlaying && position.advancing,
+                                        durationMs = durationMs,
+                                        lyricsUnavailable = lyricsUnavailable,
+                                        loadingText = lyricsLoadingText,
+                                        onClick = openLyrics,
+                                    )
+                                }
+                                if (!lyricsOpen && !syncedLyricsEnabled) {
+                                    Text(
+                                        text = "\u00A0",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        maxLines = 1,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .offset(y = 6.dp)
+                                            .padding(vertical = 4.dp),
+                                    )
+                                }
+                                if (lyricsOpen) {
+                                    LyricsStatusWithChange(
+                                        status = lyricsTranslation.status,
+                                        onStatusClick = { showLyricsProviders = true },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .offset(y = 6.dp)
+                                            .padding(vertical = 4.dp),
+                                    )
+                                }
+                            }
+                            val transitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
+                            PlayerScrubber(
+                                shown = shown,
+                                durationMs = durationMs,
+                                loading = versionSwitching,
+                                mixing = mixing && !scrub.scrubbing,
+                                // Hidden while scrubbing: the planner is still describing
+                                // where the transition *would* be, and a marker sitting under
+                                // a finger that is moving the playhead invites reading it as
+                                // a drag target.
+                                transitionWindow = transitionWindow
+                                    ?.takeIf { !scrub.scrubbing && it.end > it.start }
+                                    ?.let { it.start..it.end },
+                                onScrub = onScrub,
+                                onScrubFinished = onScrubFinished,
+                            ) {
+                                PlaybackQualityLabel(
+                                    song = song,
+                                    isLoading = isLoading,
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .padding(horizontal = 8.dp),
+                                )
+                            }
 
-                    val transport: @Composable () -> Unit = {
-                        TransportRow(
-                            isPlaying = isPlaying,
-                            isLoading = isLoading || audioVersionSwitching,
-                            previousEnabled = !controlsLocked &&
-                                (hasPrevious || pastRestartPoint),
-                            nextEnabled = !controlsLocked && hasNext,
-                            onPrevious = onPrevious,
-                            onPlayPause = onPlayPause,
-                            onNext = onNext,
-                        )
-                    }
-                    if (!hideVolumeBar) {
-                        // The transport rides midway between the two blocks it
-                        // separates: the scrubber above it, and the volume bar and
-                        // toggle row below, which sit close enough together to read
-                        // as one. Both of its own gaps take half the spread, so on a
-                        // tall screen it holds the centre rather than drifting up
-                        // under the seek bar.
-                        Spacer(Modifier.height(8.dp + controlSpread / 2))
-                        transport()
-                        Spacer(Modifier.height(12.dp + controlSpread / 2))
-                        VolumeRow(
-                            value = { volume.level.value },
-                            onValueChange = onVolumeChange,
-                            onValueChangeFinished = onVolumeChangeFinished,
-                        )
-                        // The volume slider already has 13dp below its drawn track.
-                        // Balance that invisible inset with the caption gap below the icons.
-                        Spacer(Modifier.height(6.dp))
-                    } else {
-                        // No volume bar: the transport centres itself in the whole run
-                        // between the scrubber and the bottom row instead. The run is
-                        // exactly as tall as with the bar, so the half-player's height
-                        // never depends on the setting — only where the transport sits.
-                        // The scrubber draws its times 9dp above their slot, which
-                        // leaves that much more visible room above; half of it moves
-                        // from the top gap to the bottom one.
-                        val run = 8.dp + 12.dp + 6.dp + controlSpread + VOLUME_ROW_HEIGHT
-                        val lift = SCRUBBER_LABEL_LIFT / 2
-                        Spacer(Modifier.height(run / 2 - lift))
-                        transport()
-                        Spacer(Modifier.height(run / 2 + lift))
+                            val transport: @Composable () -> Unit = {
+                                TransportRow(
+                                    isPlaying = isPlaying,
+                                    isLoading = isLoading || audioVersionSwitching,
+                                    previousEnabled = !controlsLocked &&
+                                        (hasPrevious || pastRestartPoint),
+                                    nextEnabled = !controlsLocked && hasNext,
+                                    onPrevious = onPrevious,
+                                    onPlayPause = onPlayPause,
+                                    onNext = onNext,
+                                )
+                            }
+                            if (!hideVolumeBar) {
+                                // The transport rides midway between the two blocks it
+                                // separates: the scrubber above it, and the volume bar and
+                                // toggle row below, which sit close enough together to read
+                                // as one. Both of its own gaps take half the spread, so on a
+                                // tall screen it holds the centre rather than drifting up
+                                // under the seek bar.
+                                Spacer(Modifier.height(8.dp + controlSpread / 2))
+                                transport()
+                                Spacer(Modifier.height(12.dp + controlSpread / 2))
+                                VolumeRow(
+                                    value = { volume.level.value },
+                                    onValueChange = onVolumeChange,
+                                    onValueChangeFinished = onVolumeChangeFinished,
+                                )
+                                // The volume slider already has 13dp below its drawn track.
+                                // Balance that invisible inset with the caption gap below the icons.
+                                Spacer(Modifier.height(6.dp))
+                            } else {
+                                // No volume bar: the transport centres itself in the whole run
+                                // between the scrubber and the bottom row instead. The run is
+                                // exactly as tall as with the bar, so the half-player's height
+                                // never depends on the setting — only where the transport sits.
+                                // The scrubber draws its times 9dp above their slot, which
+                                // leaves that much more visible room above; half of it moves
+                                // from the top gap to the bottom one.
+                                val run = 8.dp + 12.dp + 6.dp + controlSpread + VOLUME_ROW_HEIGHT
+                                val lift = SCRUBBER_LABEL_LIFT / 2
+                                Spacer(Modifier.height(run / 2 - lift))
+                                transport()
+                                Spacer(Modifier.height(run / 2 + lift))
+                            }
+                        }
                     }
 
                     playerActions()

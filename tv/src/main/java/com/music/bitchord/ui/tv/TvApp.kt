@@ -113,60 +113,8 @@ fun TvApp(
     val setupVersionCompleted by TvSettings.tvSetupVersionCompleted.collectAsState()
     var isRunningSetup by remember(setupVersionCompleted) { mutableStateOf(setupVersionCompleted == 0) }
     var isNowPlayingOpen by remember { mutableStateOf(false) }
-    val googleAccounts by viewModel.googleAccounts.collectAsState()
-    val activeAccountId by viewModel.activeAccountId.collectAsState()
-    val activeProfileId by viewModel.activeProfileId.collectAsState()
-
-    val initialProfileLocked = remember {
-        val profId = viewModel.activeProfileId.value
-            ?: viewModel.googleAccounts.value.firstOrNull { it.accountId == viewModel.activeAccountId.value }
-                ?.let { acc ->
-                    if (acc.profiles.isNotEmpty()) {
-                        acc.profiles.firstOrNull { !it.isBrandAccount }?.profileId
-                            ?: acc.profiles.firstOrNull()?.profileId
-                    } else {
-                        "default:${acc.accountId}"
-                    }
-                }
-            ?: viewModel.googleAccounts.value.firstOrNull()?.let { acc ->
-                if (acc.profiles.isNotEmpty()) {
-                    acc.profiles.firstOrNull { !it.isBrandAccount }?.profileId
-                        ?: acc.profiles.firstOrNull()?.profileId
-                } else {
-                    "default:${acc.accountId}"
-                }
-            }
-        profId != null && TvSettings.isProfileLocked(profId)
-    }
-
-    var sessionAuthenticated by remember { mutableStateOf(!initialProfileLocked) }
-    var showAccountDialog by remember { mutableStateOf(initialProfileLocked) }
-
-    val currentActiveProfileId = remember(googleAccounts, activeAccountId, activeProfileId) {
-        if (activeProfileId != null) {
-            activeProfileId
-        } else {
-            val account = googleAccounts.firstOrNull { it.accountId == activeAccountId }
-                ?: googleAccounts.firstOrNull()
-            if (account != null) {
-                if (account.profiles.isNotEmpty()) {
-                    account.profiles.firstOrNull { !it.isBrandAccount }?.profileId
-                        ?: account.profiles.firstOrNull()?.profileId
-                } else {
-                    "default:${account.accountId}"
-                }
-            } else {
-                null
-            }
-        }
-    }
-    val isCurrentProfileLocked = currentActiveProfileId != null && TvSettings.isProfileLocked(currentActiveProfileId)
-
-    LaunchedEffect(isCurrentProfileLocked) {
-        if (isCurrentProfileLocked && !sessionAuthenticated) {
-            showAccountDialog = true
-        }
-    }
+    var sessionAuthenticated by remember { mutableStateOf(true) }
+    var showAccountDialog by remember { mutableStateOf(false) }
 
     // Offered once per launch, and not over first-time setup. Settings'
     // "Software Update" row reopens it after it is dismissed.
@@ -536,18 +484,9 @@ private fun TvTopBar(
     onOpenAccount: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val googleAccounts by viewModel.googleAccounts.collectAsState()
-    val activeAccountId by viewModel.activeAccountId.collectAsState()
-    val activeProfileId by viewModel.activeProfileId.collectAsState()
     val account by viewModel.account.collectAsState()
     val signedIn by viewModel.signedIn.collectAsState()
-
-    val avatarUrl = remember(googleAccounts, activeAccountId, activeProfileId, account) {
-        googleAccounts.firstOrNull { it.accountId == activeAccountId }
-            ?.profiles?.firstOrNull { it.profileId == activeProfileId }
-            ?.avatar
-            ?: account?.thumbnailUrl
-    }
+    val avatarUrl = account?.thumbnailUrl
 
     // Pages fill the screen from its top edge so they can scroll under this bar,
     // which puts them outside a plain "below" search from a tab. Point Down at them.

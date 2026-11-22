@@ -1265,7 +1265,6 @@
     <string name="find_your_mood">분위기 찾기</string>
     <string name="no_audio_version">이 동영상의 오디오 버전을 찾을 수 없습니다</string>
     <string name="no_video_version">이 노래의 동영상 버전을 찾을 수 없습니다</string>
-    <string name="version_switch_in_party">함께 듣기에서는 모두가 같은 버전을 듣습니다</string>
     <string name="addon_blocked_title">이 노래를 재생할 수 없음</string>
     <string name="addon_blocked_quality">%1$s의 오디오 품질이 %2$s(으)로 설정되어 있습니다. %3$s의 노래는 무손실로만 재생됩니다. 이 노래를 재생하려면 설정 → 오디오 품질에서 변경하세요.</string>
     <string name="addon_blocked_watch">음악이 워치를 통해 재생 중이며, 워치는 오디오를 무손실 미만으로 제한합니다. 휴대전화가 음악 재생을 다시 맡으면 %1$s의 노래가 다시 재생됩니다.</string>

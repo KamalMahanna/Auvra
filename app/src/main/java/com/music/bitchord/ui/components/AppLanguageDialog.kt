@@ -125,8 +125,7 @@ fun AppLanguageDialog(
     val shape = RoundedCornerShape(ALERT_CORNER)
     // Full script tag (zh-Hant / zh-Hans preserved); legacy bare "zh" reads as Simplified.
     val currentLanguage = com.music.bitchord.data.LocaleTags.normalizeAppTag(
-        AppCompatDelegate.getApplicationLocales().get(0)?.toLanguageTag()
-            ?: Locale.getDefault().toLanguageTag(),
+        AppCompatDelegate.getApplicationLocales().get(0)?.toLanguageTag() ?: "en",
     )
 
     Box(

@@ -63,7 +63,7 @@ import com.music.bitchord.ui.tv.theme.TvMidnightPalette
 import com.music.bitchord.ui.tv.theme.TvOledPalette
 import com.music.bitchord.ui.tv.theme.TvType
 
-private enum class SetupStep { Welcome, SignIn, Appearance, Preferences, Done }
+private enum class SetupStep { Welcome, Appearance, Preferences, Done }
 
 /**
  * First-run setup, in the manner of Apple TV's: one decision per screen, a
@@ -108,13 +108,9 @@ fun TvSetupScreen(
                 message = "Your music, made for the big screen.",
                 hero = { TvAppMark(size = 106.dp) },
             ) {
-                TvSetupButton("Continue", initialFocus = true) { step = SetupStep.SignIn }
+                TvSetupButton("Continue", initialFocus = true) { step = SetupStep.Appearance }
                 TvSetupButton("Set Up Later") { finish() }
             }
-            SetupStep.SignIn -> TvSignInStep(
-                viewModel = viewModel,
-                onContinue = { step = SetupStep.Appearance },
-            )
             SetupStep.Appearance -> TvSetupPage(
                 title = "Choose a Look",
                 message = "You can change this later in Settings.",
@@ -201,42 +197,6 @@ private fun TvSetupButton(text: String, initialFocus: Boolean = false, onClick: 
     )
 }
 
-@Composable
-private fun TvSignInStep(viewModel: MainViewModel, onContinue: () -> Unit) {
-    val signedIn by viewModel.signedIn.collectAsState()
-    val account by viewModel.account.collectAsState()
-    var signingIn by remember { mutableStateOf(false) }
-
-    // Signing in from here moves on by itself once it lands.
-    LaunchedEffect(signedIn) {
-        if (signedIn && signingIn) {
-            signingIn = false
-            onContinue()
-        }
-    }
-
-    TvSetupPage(
-        title = if (signedIn) "Signed In" else "Sign In to YouTube Music",
-        message = if (signedIn) {
-            "BitChord will use ${account?.name ?: "your account"}'s library and recommendations."
-        } else {
-            "Bring your library, playlists and recommendations. You can also do this later in Settings."
-        },
-        hero = { TvAppMark(size = 77.dp) },
-    ) {
-        if (signedIn) {
-            TvSetupButton("Continue", initialFocus = true, onClick = onContinue)
-        } else {
-            TvSetupButton("Sign In", initialFocus = true) { signingIn = true }
-            TvSetupButton("Not Now", onClick = onContinue)
-        }
-    }
-
-    if (signingIn && !signedIn) {
-        // Phone (QR) sign-in is held back from setup for now; Settings still offers it.
-        TvAccountDialog(viewModel = viewModel, onDismiss = { signingIn = false }, allowPhoneSignIn = false)
-    }
-}
 
 @Composable
 private fun TvPreferencesStep(onContinue: () -> Unit) {

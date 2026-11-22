@@ -284,13 +284,7 @@ suspend fun MediaController.commitRadioQueue() {
 }
 
 
-/**
- * Marks the span of a queue-row drag — see [PartySync.beginQueueDrag]. Each
- * neighbour the row crosses is still its own `moveMediaItem`, sent the moment
- * it happens so the local queue and the on-screen list stay in step; this only
- * tells a jam's party sync to hold its publish until the row is dropped,
- * instead of sending one for every neighbour crossed along the way.
- */
+/** Marks the span of a queue-row drag. */
 fun MediaController.setQueueDragActive(active: Boolean) {
     sendCustomCommand(
         SessionCommand(ACTION_QUEUE_DRAG, Bundle.EMPTY),

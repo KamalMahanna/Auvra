@@ -48,7 +48,7 @@ enum class AppIcon(val alias: String, val iconRes: Int, val labelRes: Int, val p
             return entries.firstOrNull {
                 pm.getComponentEnabledSetting(it.component(context)) ==
                     PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-            } ?: Default
+            } ?: Monochrome
         }
 
         /** Enables [icon] before disabling the rest so there is never a moment with no launcher entry. */

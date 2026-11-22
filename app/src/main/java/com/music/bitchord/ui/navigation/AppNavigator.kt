@@ -4,7 +4,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
 import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.ui.screens.SettingsCategory
-import com.music.bitchord.ui.screens.SettingsChoiceKind
 
 /**
  * A page pushed over the tabs: Settings and every page under it, and the
@@ -17,15 +16,9 @@ import com.music.bitchord.ui.screens.SettingsChoiceKind
  */
 sealed interface AppRoute {
     data object Settings : AppRoute
-    data object AccountScrobbling : AppRoute
-    data object Sources : AppRoute
-    data object ListenTogether : AppRoute
-    data object WearOs : AppRoute
     data object Equalizer : AppRoute
     data object Replay : AppRoute
     data object History : AppRoute
-    data object Discord : AppRoute
-    data object Spotify : AppRoute
     data object Downloads : AppRoute
 
     /** A Library shelf's "Show all" — its own cards laid out again as a grid. */
@@ -43,9 +36,6 @@ sealed interface AppRoute {
 
     /** One category of Settings, opened from its row on the main Settings page. */
     data class SettingsSection(val category: SettingsCategory) : AppRoute
-
-    /** A Settings choice with more options than its row can show, as a page. */
-    data class SettingsChoice(val choice: SettingsChoiceKind) : AppRoute
 
     /** The Equalizer's list of preset curves. */
     data object EqualizerPresets : AppRoute

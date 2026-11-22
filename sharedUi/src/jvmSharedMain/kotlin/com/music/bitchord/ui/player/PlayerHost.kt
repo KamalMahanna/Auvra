@@ -5,7 +5,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.music.bitchord.data.canvas.CanvasArtwork
-import com.music.bitchord.data.listentogether.PartyMember
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.model.Song
@@ -260,8 +259,6 @@ interface PlayerSettingsSource {
     /** Turns [LocalPlayerChrome] off: glyphs and text over the artwork in plain white. */
     val disableBlendEffects: StateFlow<Boolean>
     val showNerdStats: StateFlow<Boolean>
-    /** Whether the output / Listen Together pill sits under the transport. */
-    val showListenTogetherButton: StateFlow<Boolean>
     val smartAnalysis: StateFlow<SmartAnalysis>
     /**
      * Automix's detailed stats line — both songs' analysis, then the planned
@@ -350,8 +347,6 @@ data class OutputFormatUi(
 data class PartyUi(
     val inParty: Boolean = false,
     val controlsLocked: Boolean = false,
-    val members: List<PartyMember> = emptyList(),
-    val you: PartyMember? = null,
     val code: String? = null,
 )
 

@@ -1358,7 +1358,6 @@
     <string name="signed_by">%1$s tarafından imzalandı</string>
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
-    <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
     <string name="opened_file">Açılan dosya</string>
     <string name="folders">Klasörler</string>
     <string name="folder">Klasör</string>

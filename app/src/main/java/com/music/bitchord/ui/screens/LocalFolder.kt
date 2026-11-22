@@ -128,8 +128,6 @@ class LocalFolder(
     /** An album or artist held — its menu, with the rows it covers in hand. */
     val onGroupLongPress: (LocalGroup) -> Unit,
     val onDelete: ((List<Song>) -> Unit)? = null,
-    /** Copies the selection to WebDAV; null (no server configured) hides the action. */
-    val onUpload: ((List<Song>) -> Unit)? = null,
     /**
      * Cached songs only: saves tracks to Downloads straight from the song
      * cache. Set, it puts a download button on every row, Download all in the
@@ -842,15 +840,6 @@ internal fun LocalFolderSelectionBar(
             color = if (dark) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        folder.onUpload?.let { upload ->
-            SelectionAction(
-                icon = Icons.Rounded.FileUpload,
-                label = stringResource(R.string.upload_to_webdav),
-                color = MaterialTheme.colorScheme.primary,
-                enabled = count > 0,
-                onClick = { upload(chosen()) },
-            )
-        }
         folder.onDownload?.let { download ->
             SelectionAction(
                 icon = Icons.Rounded.Download,

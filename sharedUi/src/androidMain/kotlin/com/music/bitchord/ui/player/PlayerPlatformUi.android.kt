@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.ui.platform.LocalContext
 
 internal actual fun uptimeMillis(): Long = SystemClock.uptimeMillis()
 
@@ -33,10 +32,9 @@ internal actual fun KeepScreenOn(enabled: Boolean) {
 
 @Composable
 internal actual fun appLanguageTag(): String {
-    val context = LocalContext.current
     return AppCompatDelegate.getApplicationLocales().get(0)?.toLanguageTag()
         ?.takeIf { it.isNotBlank() }
-        ?: context.resources.configuration.locales.get(0).toLanguageTag()
+        ?: "en"
 }
 
 /**

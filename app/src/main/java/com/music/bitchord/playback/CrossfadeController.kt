@@ -9,7 +9,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.MixBlend
 import com.music.bitchord.data.settings.MixDeck
@@ -911,7 +910,7 @@ class CrossfadeController(
         val step = if (AppSettings.mixViewOpen.value) IDLE_STEP_MS else PAUSED_MARKER_STEP_MS
         if (now - pausedMarkerAt < step) return
         pausedMarkerAt = now
-        if (versionSwapActive() || ListenTogether.state.value.inParty) return
+        if (versionSwapActive()) return
         if (!player.hasNextMediaItem() || player.repeatMode == Player.REPEAT_MODE_ONE) return
         // A queue restored paused is not prepared yet, so the player has no
         // duration until play: the runtime the item was queued with stands in,
@@ -947,29 +946,6 @@ class CrossfadeController(
         // same item, so the transition window and mix flag it would have
         // armed still describe the next track correctly once the swap lets go.
         if (versionSwapActive()) return
-        // Not while listening together. A blend starts the next track early, by
-        // a length this device decides for itself from its own copy of the
-        // audio — so in a party every member would begin the next song at a
-        // different moment, and each would then be dragged back by a correcting
-        // seek. The transition a party shares is the plain one: whoever reaches
-        // the end first publishes the change and everybody moves together. See
-        // [PartySync].
-        //
-        // The analysis behind it stops too, including a pass already running —
-        // see [com.music.bitchord.playback.smart.TrackAnalyzer], which reads
-        // the party for itself. Nothing here asks for one while this returns,
-        // but a request made a tick before the party started would otherwise
-        // run to completion: a whole-track decode and two model passes, spent
-        // on a transition that cannot happen.
-        if (ListenTogether.state.value.inParty) {
-            // Left behind by the last pair planned before the party started.
-            // The marker describes a transition that is no longer going to
-            // happen, and the flag a mix that is no longer running; both would
-            // otherwise sit on screen for as long as the party lasts.
-            AppSettings.smartTransitionWindow.value = null
-            AppSettings.smartMixInProgress.value = false
-            return
-        }
         // Bit-perfect output carries one stream to the DAC, unchanged. A blend
         // needs two, with gain on both, so the queue plays gapless instead.
         if (BitPerfectOutput.status.value.active) {
@@ -2857,7 +2833,7 @@ class CrossfadeController(
         val player = active()
         val item = player.currentMediaItem
         val text = when {
-            !AppSettings.smartFadeEnabled.value || item == null || ListenTogether.state.value.inParty -> null
+            !AppSettings.smartFadeEnabled.value || item == null -> null
             else -> describeAutomix(player, item)
         }
         if (AppSettings.automixDetail.value != text) AppSettings.automixDetail.value = text
@@ -3729,8 +3705,7 @@ class CrossfadeController(
         val position = player.currentPosition
         if (player !== active() ||
             player.currentMediaItemIndex != easeItemIndex ||
-            position < easeNextAtMs - 2 * easeStepMs ||
-            ListenTogether.state.value.inParty
+            position < easeNextAtMs - 2 * easeStepMs
         ) {
             endEase()
             return

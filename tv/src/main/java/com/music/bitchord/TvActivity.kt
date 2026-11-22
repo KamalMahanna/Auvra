@@ -7,7 +7,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.core.view.WindowCompat
-import com.music.bitchord.data.listentogether.JamInviteLink
 import com.music.bitchord.playback.MusicLink
 import com.music.bitchord.playback.PlayerDeepLink
 import com.music.bitchord.playback.rememberMediaController
@@ -62,7 +61,6 @@ class TvActivity : ComponentActivity() {
 
     private fun consumeLinks(intent: Intent) {
         PlayerDeepLink.consume(intent)
-        JamInviteLink.consume(intent)
         MusicLink.consume(intent)
     }
 

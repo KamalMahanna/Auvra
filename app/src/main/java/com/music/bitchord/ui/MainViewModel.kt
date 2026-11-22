@@ -4,13 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.music.bitchord.R
-import com.music.bitchord.auth.AuthStore
 import com.music.bitchord.auth.SignedIn
-import com.music.bitchord.auth.GoogleAccountSession
-import com.music.bitchord.auth.YouTubeProfile
-import com.music.bitchord.auth.profileId
-import com.music.bitchord.auth.sessionId
-import com.music.bitchord.auth.adjacentProfile
 import com.music.bitchord.data.AppUpdateChecker
 import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.LikeState
@@ -30,10 +24,7 @@ import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
 import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
-import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
 import com.music.bitchord.data.spotify.SpotifyImporter
-import com.music.bitchord.data.spotify.SpotifyLibrary
-import com.music.bitchord.data.spotify.SpotifyTrack
 import com.music.bitchord.data.lyrics.EmbeddedLyrics
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsRepository
@@ -119,8 +110,6 @@ import java.util.concurrent.atomic.AtomicLong
 enum class SearchSource { YOUTUBE, LIBRARY, ADDONS }
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
-
-    private val authStore = AuthStore(app)
 
     // Process-wide, so the playback service offers Like on the same tracks.
     private val _signedIn = SignedIn.state(app)
@@ -572,23 +561,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * The chosen channel's [AccountChannel.key], or null while the app is
      * acting as whichever channel YouTube Music serves by default.
      */
-    private val _selectedChannelKey = MutableStateFlow(
-        authStore.activeSession?.activeProfileId ?: authStore.channelPageId ?: authStore.channelDataSyncId,
-    )
+    private val _selectedChannelKey = MutableStateFlow<String?>(null)
     val selectedChannelKey: StateFlow<String?> = _selectedChannelKey.asStateFlow()
 
-    private val _selectedChannelName = MutableStateFlow(
-        authStore.activeSession?.profiles?.firstOrNull { it.profileId == authStore.activeProfileId }?.name
-            ?: authStore.channelName,
-    )
+    private val _selectedChannelName = MutableStateFlow<String?>(null)
     val selectedChannelName: StateFlow<String?> = _selectedChannelName.asStateFlow()
 
-    /** Source of truth for Google sessions and their YouTube identities. */
-    private val _googleAccounts = MutableStateFlow(authStore.sessions)
-    val googleAccounts: StateFlow<List<GoogleAccountSession>> = _googleAccounts.asStateFlow()
-    private val _activeAccountId = MutableStateFlow(authStore.activeSession?.accountId)
+    private val _activeAccountId = MutableStateFlow<String?>(null)
     val activeAccountId: StateFlow<String?> = _activeAccountId.asStateFlow()
-    private val _activeProfileId = MutableStateFlow(authStore.activeProfileId)
+    private val _activeProfileId = MutableStateFlow<String?>(null)
     val activeProfileId: StateFlow<String?> = _activeProfileId.asStateFlow()
 
     private val _history = MutableStateFlow<UiState<List<Song>>>(UiState.Loading)
@@ -679,13 +660,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * having to be re-fetched, and a later refresh can't undo it.
      */
     /** Every rating known for this account: the library's, then this session's. */
-    val likeStatuses: StateFlow<Map<String, LikeStatus>> =
-        combine(_library, LikeState.overrides) { library, overrides ->
-            val liked = (library as? UiState.Success)?.data?.likedSongs
-                ?.associate { it.videoId to LikeStatus.LIKE }
-                .orEmpty()
-            liked + overrides
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    val likeStatuses: StateFlow<Map<String, LikeStatus>> = LikeState.overrides
 
     fun likeStatusOf(videoId: String): LikeStatus =
         likeStatuses.value[videoId] ?: LikeStatus.INDIFFERENT
@@ -699,27 +674,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * registered, and people tap again.
      */
     fun setLike(videoId: String, status: LikeStatus) {
-        if (!requireSignIn()) return
         val previous = likeStatusOf(videoId)
         if (previous == status) return
         LikeState.set(videoId, status)
-        viewModelScope.launch {
-            YtMusicRepository.rate(videoId, status).fold(
-                onSuccess = {
-                    // Liked Music is now out of date either way.
-                    libraryStale = true
-                    if (status != LikeStatus.LIKE) dropFromLikedLists(videoId)
-                    // Clearing the heart means forgetting the song, not
-                    // demoting it — see [forgetFromLibrary].
-                    val unliked = previous == LikeStatus.LIKE &&
-                        status == LikeStatus.INDIFFERENT
-                    if (unliked) forgetFromLibrary(videoId)
-                },
-                onFailure = {
-                    LikeState.set(videoId, previous)
-                },
-            )
-        }
+        if (status != LikeStatus.LIKE) dropFromLikedLists(videoId)
     }
 
     /**
@@ -786,7 +744,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** As [toggleLike], for the thumb-down. */
     fun toggleDislike(videoId: String): LikeStatus? {
-        if (!requireSignIn()) return null
         val previous = likeStatusOf(videoId)
         setLike(
             videoId,
@@ -796,7 +753,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 LikeStatus.DISLIKE
             },
         )
-        return previous
+        return likeStatusOf(videoId)
     }
 
     /**
@@ -923,13 +880,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Re-fetched rather than cached for the session: playlists are edited here. */
     fun loadPlaylists() {
-        if (!_signedIn.value || _playlistsLoading.value) return
-        val identity = listenerKey()
-        _playlistsLoading.value = true
-        viewModelScope.launch {
-            YtMusicRepository.userPlaylists().onSuccess { if (identity == listenerKey()) _playlists.value = it }
-            if (identity == listenerKey()) _playlistsLoading.value = false
-        }
+        _playlists.value = emptyList()
+        _playlistsLoading.value = false
     }
 
     /**
@@ -1108,51 +1060,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     ) {
         val name = title.trim().ifBlank { text(R.string.new_playlist) }
         viewModelScope.launch {
-            if (authStore.isSignedIn) {
-                val initialBatch = videoIds.take(50)
-                YtMusicRepository.createPlaylist(
-                    title = name,
-                    privacy = privacy,
-                    videoIds = initialBatch,
-                ).fold(
-                    onSuccess = { playlistId ->
-                        if (videoIds.size > 50) {
-                            videoIds.drop(50).chunked(50).forEach { chunk ->
-                                YtMusicRepository.addToPlaylist(playlistId, chunk)
-                            }
-                        }
-                        setPlaylistOwned("VL$playlistId", true)
-                        libraryStale = true
-                        val created = UserPlaylist(
-                            playlistId = playlistId,
-                            title = name,
-                            subtitle = "${videoIds.size} songs",
-                            thumbnailUrl = null,
-                        )
-                        _playlists.value = listOf(created) +
-                            _playlists.value.filterNot { it.playlistId == created.playlistId }
-                        editPlaylistShelf { items ->
-                            listOf(
-                                ShelfItem(
-                                    title = created.title,
-                                    subtitle = created.subtitle,
-                                    thumbnailUrl = created.thumbnailUrl,
-                                    videoId = null,
-                                    browseId = created.browseId,
-                                ),
-                            ) + items.filterNot { it.browseId == created.browseId }
-                        }
-                        onResult?.invoke(created.browseId, created.title, false)
-                    },
-                    onFailure = {
-                        val local = com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
-                        onResult?.invoke(local.browseId, local.title, true)
-                    },
-                )
-            } else {
-                val local = com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
-                onResult?.invoke(local.browseId, local.title, true)
-            }
+            val local = com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
+            onResult?.invoke(local.browseId, local.title, true)
         }
     }
 
@@ -1493,23 +1402,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
-            AppSettings.webdavUrl.drop(1).collect {
-                reloadRemoteDetail(com.music.bitchord.data.webdav.WebDavConfig.BROWSE_ID)
-            }
-        }
-        viewModelScope.launch {
-            combine(
-                AppSettings.smbHost,
-                AppSettings.smbShare,
-                AppSettings.smbBasePath,
-                AppSettings.smbUsername,
-                AppSettings.smbPassword,
-            ) { fields -> fields.toList() }
-                .drop(1)
-                .debounce(300)
-                .collect { reloadRemoteDetail(com.music.bitchord.data.smb.SmbConfig.BROWSE_ID) }
-        }
-        viewModelScope.launch {
             // A leftover APK only means "Install Now" for the session that
             // downloaded it — see AppUpdateChecker.clearCache.
             AppUpdateChecker.clearCache(getApplication())
@@ -1554,33 +1446,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun loadAccount() {
-        val identity = listenerKey()
         viewModelScope.launch {
-            val account = YtMusicRepository.account().getOrNull()
-            if (identity != listenerKey()) return@launch
-            _account.value = account
-            // A channel picked in the in-app browser arrives as ids and nothing
-            // else — the page's `ytcfg` never says what the channel is called.
-            // The account menu, asked *as* that channel, answers with its name,
-            // which is what the settings row needs to show.
-            if (account != null && _selectedChannelKey.value != null) {
-                _selectedChannelName.value = account.name
-                val accountId = _activeAccountId.value
-                val profileId = _activeProfileId.value
-                val session = accountId?.let { id -> authStore.sessions.firstOrNull { it.accountId == id } }
-                val updated = session?.let { saved -> saved.copy(
-                    name = account.name, email = account.email,
-                    profiles = saved.profiles.map { profile ->
-                        if (profile.profileId == profileId) profile.copy(
-                            name = account.name, handle = account.email, avatar = account.thumbnailUrl,
-                        ) else profile
-                    },
-                ) }
-                if (updated != null) {
-                    authStore.upsertSession(updated, activate = false)
-                    _googleAccounts.value = authStore.sessions
-                }
-            }
+            _account.value = YtMusicRepository.account().getOrNull()
         }
     }
 
@@ -1931,39 +1798,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun fetchLibrary(identity: String?) {
         val next = YtMusicRepository.library().fold(
             onSuccess = { page ->
-                // Liked Music is published with just its first page on the tab;
-                // the rest of the collection is synced into LikeState here, in
-                // this ViewModel's scope, so it is cancelled with the screen and
-                // a liked track past the first page still reads as liked.
-                page.likedContinuation?.let { token -> syncLikedMusic(identity, token) }
                 if (page.isEmpty) UiState.Error(text(R.string.library_empty))
                 else UiState.Success(page.copy(likedContinuation = null))
             },
             onFailure = { UiState.Error(it.friendly()) },
         )
         if (identity == listenerKey()) _library.value = next
-    }
-
-    /**
-     * Follows Liked Music's continuation chain to exhaustion, seeding each
-     * page's ids into [LikeState] so every liked track reads as liked.
-     *
-     * Scoped to [viewModelScope] — a re-fetch of the library cancels and
-     * replaces it, and it dies with the screen. It only ever seeds ids, never
-     * retaining the full songs for pages already behind the tab.
-     *
-     * [identity] is the listener this token belongs to, checked before every
-     * page: [LikeState] is a single shared map, not scoped per account, so a
-     * sync still in flight when the listener switches must stop rather than
-     * go on seeding the old account's likes into the new one's session.
-     */
-    private fun syncLikedMusic(identity: String?, token: String) {
-        likedSyncJob?.cancel()
-        likedSyncJob = viewModelScope.launch {
-            YtMusicRepository.syncLikedMusic(token) { next ->
-                if (identity != listenerKey()) null else YtMusicRepository.moreSongs(next).getOrNull()
-            }
-        }
     }
 
     /**
@@ -1977,7 +1817,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun loadHistory() {
         if (!_signedIn.value) {
-            _history.value = UiState.Error(text(R.string.history_sign_in_required))
+            _history.value = UiState.Error(text(R.string.no_tracks_here))
             return
         }
         val identity = listenerKey()
@@ -2216,24 +2056,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Reads the Local Music folder for the Library source. Re-read on every
-     * switch to it, so files added since — or a permission granted since —
-     * are in the next answer; the last list stays up meanwhile.
+     * Reads downloaded songs for the Library search source without requiring any storage permissions.
      */
     fun loadLibrarySongs() {
         viewModelScope.launch {
             val context = getApplication<Application>()
-            _librarySongs.value = if (!LocalMediaRepository.hasStoragePermission(context)) {
-                UiState.Error(text(R.string.storage_required_read))
-            } else {
-                runCatching { LocalMediaRepository.getLocalMusic(context) }.fold(
-                    onSuccess = { songs ->
-                        if (songs.isEmpty()) UiState.Error(text(R.string.no_local_audio_found))
-                        else UiState.Success(songs)
-                    },
-                    onFailure = { UiState.Error(text(R.string.no_local_audio_found)) },
-                )
-            }
+            _librarySongs.value = runCatching { Downloads.getDownloadedSongs(context) }.fold(
+                onSuccess = { songs ->
+                    if (songs.isEmpty()) UiState.Error(text(R.string.no_tracks_here))
+                    else UiState.Success(songs)
+                },
+                onFailure = { UiState.Error(text(R.string.no_tracks_here)) },
+            )
         }
     }
 
@@ -2670,19 +2504,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val songs: suspend () -> List<Song>,
     )
 
-    private fun remoteLibrary(browseId: String): RemoteLibrary? = when (browseId) {
-        com.music.bitchord.data.webdav.WebDavConfig.BROWSE_ID ->
-            RemoteLibrary(
-                R.string.webdav_empty,
-                com.music.bitchord.data.webdav.WebDavRepository::getSongs,
-            )
-        com.music.bitchord.data.smb.SmbConfig.BROWSE_ID ->
-            RemoteLibrary(
-                R.string.smb_empty,
-                com.music.bitchord.data.smb.SmbRepository::getSongs,
-            )
-        else -> null
-    }
+    private fun remoteLibrary(browseId: String): RemoteLibrary? = null
 
     private suspend fun remoteSongsState(remote: RemoteLibrary): UiState<List<Song>> =
         com.music.bitchord.data.remote.RemoteListing.state(runCatching { remote.songs() }, text(remote.emptyRes))
@@ -2713,10 +2535,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 it.browseId == browseId && it.songs is UiState.Loading
             } == true
         ) return
-        if (browseId.startsWith(SPOTIFY_PAGE_PREFIX)) {
-            openSpotifyPage(browseId, title, subtitle, thumbnailUrl)
-            return
-        }
         val resolved = browseTypeOf(browseId, type)
         _detailStack.value += DetailPage(
             browseId = browseId,
@@ -2880,86 +2698,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             more?.let { fillIn(browseId, it, thumbnailUrl ?: artwork) }
         }
     }
-
-    /**
-     * A Spotify playlist opened as an ordinary playlist page.
-     *
-     * Spotify's rows go up as soon as they are read, each marked as still
-     * waiting on its YouTube Music version (see [isMatchPending]); the matches
-     * then arrive in order and swap the rows in place, so the page is usable
-     * before the last song has been found.
-     */
-    private fun openSpotifyPage(browseId: String, title: String, subtitle: String, thumbnailUrl: String?) {
-        _detailStack.value += DetailPage(
-            browseId = browseId,
-            title = title,
-            subtitle = subtitle,
-            thumbnailUrl = thumbnailUrl,
-            songs = UiState.Loading,
-            type = BrowseType.PLAYLIST,
-        )
-        viewModelScope.launch {
-            val playlistId = browseId.removePrefix(SPOTIFY_PAGE_PREFIX)
-            fun open() = _detailStack.value.any { it.browseId == browseId }
-            fun setSongs(songs: UiState<List<Song>>) {
-                _detailStack.value = _detailStack.value.map {
-                    if (it.browseId == browseId) it.copy(songs = songs) else it
-                }
-            }
-            // The list only had a thumbnail; the full-size cover replaces it
-            // once this page has asked for it.
-            launch {
-                val cover = runCatching { SpotifyLibrary.cover(playlistId) }.getOrNull() ?: return@launch
-                _detailStack.value = _detailStack.value.map {
-                    if (it.browseId == browseId) it.copy(thumbnailUrl = cover) else it
-                }
-            }
-            val tracks = runCatching {
-                SpotifyLibrary.tracks(playlistId) { soFar ->
-                    setSongs(UiState.Success(soFar.map { it.asPendingSong() }))
-                }
-            }.getOrElse {
-                setSongs(UiState.Error(it.message ?: text(R.string.failed)))
-                return@launch
-            }
-            if (tracks.isEmpty()) {
-                setSongs(UiState.Error(text(R.string.spotify_empty_tracks)))
-                return@launch
-            }
-            val gate = Semaphore(SPOTIFY_MATCH_PARALLELISM)
-            coroutineScope {
-                tracks.forEachIndexed { index, track ->
-                    launch {
-                        gate.withPermit {
-                            if (!open()) return@withPermit
-                            val match = runCatching { SpotifyImporter.matchTrack(track) }.getOrNull()
-                            val found = match?.copy(thumbnailUrl = match.thumbnailUrl ?: track.imageUrl)
-                                ?: track.asPendingSong().let {
-                                    it.copy(videoId = SPOTIFY_MISSING_PREFIX + track.id)
-                                }
-                            _detailStack.value = _detailStack.value.map { page ->
-                                val list = (page.songs as? UiState.Success<List<Song>>)?.data
-                                if (page.browseId == browseId && list != null && index < list.size) {
-                                    page.copy(songs = UiState.Success(list.toMutableList().also { it[index] = found }))
-                                } else page
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun SpotifyTrack.asPendingSong() = Song(
-        videoId = SPOTIFY_PENDING_PREFIX + id,
-        title = title,
-        artist = artist,
-        thumbnailUrl = imageUrl,
-        durationText = durationMs.takeIf { it > 0 }?.let { ms ->
-            "%d:%02d".format(ms / 60000, ms / 1000 % 60)
-        },
-        albumName = album,
-    )
 
     /**
      * Pushes one album, playlist or artist out of a device folder as a page of
@@ -3296,303 +3034,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             YtMusicRepository.accountChannels()
                 .onSuccess {
                     _channels.value = it
-                    persistDetectedProfiles(it)
                 }
             _channelsLoading.value = false
         }
     }
 
-    /**
-     * Acts as [channel] from here on.
-     *
-     * Everything already on screen belongs to the channel being left — its
-     * library, its hearts, its playlists — so the switch clears them and
-     * refetches rather than letting the new identity's pages arrive one at a
-     * time on top of the old one's.
-     */
-    fun selectChannel(channel: AccountChannel) {
-        val accountId = _activeAccountId.value ?: return
-        val profile = YouTubeProfile(
-            profileId = profileId(channel.pageId, channel.dataSyncId, channel.name),
-            name = channel.name, handle = channel.subtitle, avatar = channel.thumbnailUrl,
-            pageId = channel.pageId, dataSyncId = channel.dataSyncId,
-            isBrandAccount = channel.pageId != null,
-        )
-        selectProfile(accountId, profile.profileId, profile)
-    }
+    fun selectChannel(channel: AccountChannel) {}
 
-    /**
-     * A session lifted out of the in-app browser — a fresh sign-in, or the same
-     * login now pointed at a different channel.
-     *
-     * One path for both because they differ in exactly one thing: whether the
-     * cookie is new. What follows — adopt the identity the captured page
-     * reported, remember it, and refetch everything that belongs to a listener
-     * — is the same work either way.
-     */
-    fun onWebSession(
-        session: CapturedSession,
-        mode: WebSessionMode,
-        onComplete: (Boolean) -> Unit = {},
-    ) {
-        if (!session.loggedIn) {
-            onComplete(false)
-            return
-        }
-        val oldAccountId = _activeAccountId.value
-        val oldProfileId = _activeProfileId.value
-        viewModelScope.launch {
-            // Validate the exact cookie/profile pair before writing any of it.
-            // The old implementation persisted first and unconditionally set
-            // signedIn=true; a half-finished channel chooser therefore became
-            // a durable broken "Personal" account.
-            Innertube.cookie = session.cookie
-            Innertube.adoptSessionScope(
-                pageId = session.pageId,
-                dataSyncId = session.dataSyncId,
-                authUser = session.authUser,
-                visitorData = session.visitorData,
-                clientVersion = session.clientVersion,
-                loggedIn = true,
-            )
-            Innertube.selectChannel(session.pageId, session.dataSyncId, session.authUser)
+    private fun listenerKey(): String? = null
 
-            val account = withTimeoutOrNull(20_000L) {
-                var result = YtMusicRepository.account()
-                if (result.isFailure) {
-                    delay(750L)
-                    result = YtMusicRepository.account()
-                }
-                result.getOrNull()
-            }
-            if (account == null) {
-                restoreActiveSession(oldAccountId, oldProfileId)
-                onComplete(false)
-                return@launch
-            }
-
-            // A channel switch is another identity under the same Google
-            // login, never a new Google account. For a fresh sign-in, matching
-            // a non-empty email upgrades the existing entry instead of adding
-            // a duplicate after cookies rotate.
-            val accountId = when (mode) {
-                WebSessionMode.SWITCH_CHANNEL -> oldAccountId
-                WebSessionMode.SIGN_IN -> authStore.sessions.firstOrNull {
-                    account.email.isNotBlank() && it.email.equals(account.email, ignoreCase = true)
-                }?.accountId ?: sessionId(session.cookie, null)
-            }
-            if (accountId == null) {
-                restoreActiveSession(oldAccountId, oldProfileId)
-                onComplete(false)
-                return@launch
-            }
-            val previous = authStore.sessions.firstOrNull { it.accountId == accountId }
-            val selectedProfileId = profileId(session.pageId, session.dataSyncId, account.name)
-            val profile = YouTubeProfile(
-                profileId = selectedProfileId,
-                name = account.name,
-                handle = account.email,
-                avatar = account.thumbnailUrl,
-                pageId = session.pageId,
-                dataSyncId = session.dataSyncId,
-                authUser = session.authUser,
-                isBrandAccount = session.pageId != null,
-            )
-            val hasRealIdentity = profile.pageId != null || profile.dataSyncId != null
-            val profiles = previous?.profiles.orEmpty().filterNot { known ->
-                known.profileId == profile.profileId ||
-                    (hasRealIdentity && known.profileId.startsWith("profile:"))
-            } + profile
-            val stored = GoogleAccountSession(
-                accountId = accountId,
-                cookie = session.cookie,
-                name = account.name,
-                email = account.email,
-                profiles = profiles,
-                activeProfileId = profile.profileId,
-            )
-
-            val wasSignedIn = _signedIn.value
-            if (wasSignedIn) cacheCurrentListener()
-            authStore.upsertSession(stored)
-            authStore.cookie = session.cookie // legacy compatibility only
-            _googleAccounts.value = authStore.sessions
-            _activeAccountId.value = accountId
-            _activeProfileId.value = profile.profileId
-            _selectedChannelKey.value = profile.profileId
-            _selectedChannelName.value = account.name
-            _account.value = account
-            _channels.value = emptyList()
-            _signedIn.value = true
-
-            // Every resolver verdict and personalised page belongs to the
-            // identity that was active before validation succeeded.
-            StreamResolver.onSessionChanged()
-            if (wasSignedIn) clearListenerState()
-            reloadForAccount()
-            loadChannels(force = true)
-            onComplete(true)
-        }
-    }
-
-    /** Put request signing back exactly as it was after a rejected candidate. */
-    private fun restoreActiveSession(accountId: String?, selectedProfileId: String?) {
-        val account = authStore.sessions.firstOrNull { it.accountId == accountId }
-        val profile = account?.profiles?.firstOrNull { it.profileId == selectedProfileId }
-        Innertube.cookie = account?.cookie
-        Innertube.selectChannel(profile?.pageId, profile?.dataSyncId, profile?.authUser)
-    }
-
-    /** Selects an identity without ever allowing a response to replace it. */
-    fun selectProfile(accountId: String, selectedProfileId: String, supplied: YouTubeProfile? = null) {
-        val source = _googleAccounts.value.firstOrNull { it.accountId == accountId } ?: return
-        val profile = supplied ?: source.profiles.firstOrNull { it.profileId == selectedProfileId } ?: return
-        if (accountId == _activeAccountId.value && profile.profileId == _activeProfileId.value) return
-        cacheCurrentListener()
-        val index = source.profiles.indexOfFirst { it.profileId == profile.profileId }
-        val updatedProfiles = if (index >= 0) {
-            source.profiles.toMutableList().apply { set(index, profile) }
-        } else {
-            source.profiles + profile
-        }
-        val updated = source.copy(
-            profiles = updatedProfiles,
-            activeProfileId = profile.profileId,
-        )
-        authStore.upsertSession(updated)
-        authStore.select(accountId, profile.profileId)
-        _googleAccounts.value = authStore.sessions
-        _activeAccountId.value = accountId
-        _activeProfileId.value = profile.profileId
-        authStore.cookie = updated.cookie
-        Innertube.cookie = updated.cookie
-        Innertube.selectChannel(profile.pageId, profile.dataSyncId, profile.authUser)
-        _selectedChannelKey.value = profile.profileId
-        _selectedChannelName.value = profile.name
-        StreamResolver.onSessionChanged()
-        clearListenerState(restoreCached = true)
-        reloadForAccount()
-    }
-
-    /** Returns false at an edge, allowing the avatar to play its elastic cue. */
-    fun stepProfile(forward: Boolean): Boolean {
-        val target = adjacentProfile(_googleAccounts.value, _activeAccountId.value, _activeProfileId.value, forward)
-            ?: return false
-        selectProfile(target.first, target.second)
-        return true
-    }
-
-    fun removeAccount(accountId: String) {
-        val fallback = authStore.removeAccount(accountId)
-        _googleAccounts.value = authStore.sessions
-        if (fallback == null) { signOut(); return }
-        selectProfile(fallback.accountId, fallback.activeProfileId ?: fallback.profiles.firstOrNull()?.profileId ?: return)
-    }
-
-    private fun persistDetectedProfiles(channels: List<AccountChannel>) {
-        val accountId = _activeAccountId.value ?: return
-        val current = authStore.sessions.firstOrNull { it.accountId == accountId } ?: return
-        val detected = channels.map { channel -> YouTubeProfile(
-            profileId(channel.pageId, channel.dataSyncId, channel.name), channel.name, channel.subtitle,
-            channel.thumbnailUrl, channel.pageId, channel.dataSyncId,
-            isBrandAccount = channel.pageId != null,
-        ) }
-        // A profile captured before its channel existed carries a provisional,
-        // name-hash id (see profileId()) rather than the pageId/dataSyncId Google
-        // reports here once the channel is live. Once Google actually reports a
-        // channel, that placeholder is stale — it would have been listed here
-        // too if it still lacked real ids — and it's dropped rather than kept
-        // alongside the identity it was standing in for. An empty response
-        // (channel not created yet, or a transient miss) must never drop it.
-        val stalePlaceholder = if (detected.isEmpty()) emptySet() else current.profiles
-            .filter { it.profileId.startsWith("profile:") }
-            .map { it.profileId }
-            .toSet()
-        // Keep the captured active identity if Google's endpoint temporarily
-        // omits it; an empty/partial response must never erase a selection.
-        val profiles = (current.profiles.filter { known ->
-            known.profileId !in stalePlaceholder && detected.none { it.profileId == known.profileId }
-        } + detected)
-        val selected = when {
-            current.activeProfileId != null && current.activeProfileId !in stalePlaceholder -> current.activeProfileId
-            current.activeProfileId in stalePlaceholder -> detected.singleOrNull()?.profileId
-            else -> null
-        } ?: profiles.firstOrNull()?.profileId
-        authStore.upsertSession(current.copy(profiles = profiles, activeProfileId = selected), activate = false)
-        _googleAccounts.value = authStore.sessions
-    }
-
-    /**
-     * Drops everything on screen that belongs to the identity being left.
-     *
-     * The hearts, the playlists and the library are all answers to "who is
-     * asking", so keeping them across a switch shows the new channel the old
-     * one's music until each page happens to be refetched.
-     */
-    private fun cacheCurrentListener() {
-        val key = listenerKey() ?: return
-        listenerCache[key] = ListenerSnapshot(
-            _account.value, _library.value, _history.value, _playlists.value, _playlistOwned.value,
-        )
-    }
-
-    private fun listenerKey(): String? = _activeAccountId.value?.let { accountId ->
-        _activeProfileId.value?.let { profileId -> "$accountId:$profileId" }
-    }
-
-    private fun clearListenerState(restoreCached: Boolean = false) {
-        _account.value = null
-        likedSyncJob?.cancel()
-        LikeState.clear()
-        _playlistsLoading.value = false
-        _playlists.value = emptyList()
-        _playlistOwned.value = emptyMap()
-        ownershipInFlight.clear()
-        _songMenu.value = null
-        _library.value = UiState.Loading
-        _history.value = UiState.Loading
-        if (restoreCached) listenerCache[listenerKey()]?.let { cached ->
-            _account.value = cached.account
-            _library.value = cached.library
-            _history.value = cached.history
-            _playlists.value = cached.playlists
-            _playlistOwned.value = cached.owned
-        }
-    }
-
-    /**
-     * Everything that is "the signed-in listener's", refetched.
-     *
-     * The scope comes first, and inside one coroutine rather than beside them:
-     * which channel the session acts as decides what "the library" and "the
-     * history" even refer to, so loading them first and scoping second shows
-     * the listener the wrong account's music and then silently disagrees with
-     * itself.
-     */
-    private fun reloadForAccount() {
-        viewModelScope.launch {
-            Innertube.ensureSessionScope()
-            loadHome()
-            loadLibrary()
-            loadAccount()
-            loadPlaylists()
-        }
-    }
+    fun stepProfile(forward: Boolean): Boolean = false
 
     fun signOut() {
-        // In a multi-account install, sign out removes only the current Google
-        // session and restores another one. A legacy single-account install
-        // retains the familiar full sign-out behaviour.
-        val current = _activeAccountId.value
-        if (current != null && authStore.sessions.size > 1) {
-            removeAccount(current)
-            return
-        }
-        authStore.signOut()
         Innertube.cookie = null
-        // The mirror image: verdicts reached with a session in hand say nothing
-        // about what an anonymous walk will be told, and the clients stood down
-        // for refusing the session deserve a fresh hearing without it.
         StreamResolver.onSessionChanged()
         _signedIn.value = false
         _account.value = null
@@ -3600,12 +3054,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _channels.value = emptyList()
         _selectedChannelKey.value = null
         _selectedChannelName.value = null
-        _googleAccounts.value = emptyList()
         _activeAccountId.value = null
         _activeProfileId.value = null
         _library.value = UiState.Loading
-        // Ratings and playlists belong to the account that just left; keeping
-        // them would show the next signed-in user someone else's hearts.
         likedSyncJob?.cancel()
         LikeState.clear()
         _playlists.value = emptyList()

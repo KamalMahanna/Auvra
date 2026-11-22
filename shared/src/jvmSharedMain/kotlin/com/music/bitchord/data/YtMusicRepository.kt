@@ -569,74 +569,14 @@ object YtMusicRepository {
      * parallel and a feed that fails or is simply empty (a fresh account has
      * no saved albums) is dropped rather than failing the whole page.
      */
-    suspend fun library(): Result<LibraryPage> = call("library") {
-        coroutineScope {
-            // Liked Music is read one page at a time. The first page is what
-            // the Library tab needs to fill and is published straight away;
-            // the rest of the collection is synced into LikeState in the
-            // background, so a liked track past the first page still reads as
-            // liked without holding this page open behind the whole list —
-            // see [syncLikedMusic] and MainViewModel's fetchLibrary.
-            val liked = async { browseSongs(LIKED_MUSIC).getOrNull() }
-            val added = async { runCatching { songsPaged(LIBRARY_SONGS) }.getOrDefault(emptyList()) }
-            val shelves = LIBRARY_FEEDS
-                .map { (title, browseId) ->
-                    async {
-                        HomeShelf(title, runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList()))
-                    }
-                }
-                .awaitAll()
-                .filter { it.items.isNotEmpty() }
+    suspend fun library(): Result<LibraryPage> =
+        Result.success(LibraryPage(emptyList(), emptyList(), emptyList()))
 
-            val likedPage = liked.await()
-            val likedSongs = likedPage?.songs.orEmpty()
-            val likedIds = likedSongs.mapTo(HashSet()) { it.videoId }
-            LikeState.seedLiked(likedIds)
-            LibraryPage(
-                likedSongs = likedSongs,
-                // Thumbs-up'd tracks are also in the library feed; only what
-                // the "Liked Music" list doesn't already cover is worth a
-                // second section.
-                librarySongs = added.await().filterNot { it.videoId in likedIds },
-                shelves = shelves,
-                likedContinuation = likedPage?.continuation,
-            )
-        }
-    }
-
-    /**
-     * Finishes syncing the liked collection into [LikeState], following
-     * [firstToken] page by page until the feed runs dry.
-     *
-     * Unlike [songsPaged]'s [MAX_PAGES], this is deliberately unbounded: it
-     * seeds only video ids (not the full [Song]s), so syncing a long Liked
-     * Music library stays cheap, and stopping at a page cap would leave every
-     * liked track past that page reading as "not liked" — the very symptom
-     * #219 reported.
-     *
-     * [loadNext] is injectable so the pagination loop is unit-testable; the
-     * default reads through [moreSongs] and stops on a failed page rather
-     * than surfacing an error for a background sync. Cancellation is
-     * cooperative and the caller (a ViewModel scope in the app) decides when
-     * this outlives its usefulness.
-     *
-     * Guards only against a token repeating — a page pointing back at one
-     * already read, which would otherwise spin forever — rather than a page
-     * count, since a genuinely large library is exactly what this exists to
-     * keep reading.
-     */
     suspend fun syncLikedMusic(
         firstToken: String?,
         loadNext: suspend (String) -> SongPage? = { moreSongs(it).getOrNull() },
     ) {
-        if (firstToken == null) return
-        val seen = HashSet<String>()
-        var next: String? = firstToken
-        while (next != null && seen.add(next)) {
-            val page = loadNext(next) ?: return
-            LikeState.seedLiked(page.songs.mapTo(HashSet()) { it.videoId })
-            next = page.continuation
-        }
+        // Remote liked music sync disabled
     }
 
     /**
@@ -989,12 +929,10 @@ object YtMusicRepository {
             ?: error("no menu for $videoId")
     }
 
-    suspend fun rate(videoId: String, status: LikeStatus): Result<Unit> =
-        call("rate:$videoId") { Innertube.rate(videoId, status) }
+    suspend fun rate(videoId: String, status: LikeStatus): Result<Unit> = Result.success(Unit)
 
     /** Adds or removes a track from the library; [token] says which. */
-    suspend fun setLibraryStatus(token: String): Result<Unit> =
-        call("library:feedback") { Innertube.sendFeedback(token) }
+    suspend fun setLibraryStatus(token: String): Result<Unit> = Result.success(Unit)
 
     /**
      * Saves an album or playlist to the library, or removes it. [playlistId] is
@@ -1009,8 +947,7 @@ object YtMusicRepository {
     suspend fun releaseLibraryState(browseId: String): Result<LibraryState?> =
         call("library-state:$browseId") { InnertubeParser.parseLibraryState(Innertube.browse(browseId)) }
 
-    suspend fun setSaved(playlistId: String, saved: Boolean): Result<Unit> =
-        call("library:$playlistId") { Innertube.ratePlaylist(playlistId, saved) }
+    suspend fun setSaved(playlistId: String, saved: Boolean): Result<Unit> = Result.success(Unit)
 
     /**
      * Subscribes to an artist's channel, or unsubscribes. [channelId] is the one
@@ -1020,103 +957,37 @@ object YtMusicRepository {
     suspend fun setSubscribed(channelId: String, subscribed: Boolean): Result<Unit> =
         call("subscription:$channelId") { Innertube.setSubscribed(channelId, subscribed) }
 
-    /**
-     * The playlists a track can be added to. Paged because accounts with long
-     * playlist collections otherwise lose everything past YouTube's first
-     * library-feed response.
-     */
-    suspend fun userPlaylists(): Result<List<UserPlaylist>> = call("playlists") {
-        InnertubeParser.parseUserPlaylists(libraryItemsPaged(LIBRARY_PLAYLISTS))
-    }
+    suspend fun userPlaylists(): Result<List<UserPlaylist>> = Result.success(emptyList())
 
-    /**
-     * All playlists in user library (including Liked Music and saved playlists).
-     */
-    suspend fun libraryPlaylists(): Result<List<ShelfItem>> = call("libraryPlaylists") {
-        InnertubeParser.parseLibraryItems(Innertube.browse(LIBRARY_PLAYLISTS))
-    }
+    suspend fun libraryPlaylists(): Result<List<ShelfItem>> = Result.success(emptyList())
 
-    /** Creates a playlist, optionally seeded with [videoIds]; returns its id. */
     suspend fun createPlaylist(
         title: String,
         privacy: PlaylistPrivacy,
         videoIds: List<String> = emptyList(),
-    ): Result<String> = call("playlist:create") {
-        Innertube.createPlaylist(title, privacy, videoIds = videoIds)
-    }
+    ): Result<String> = Result.failure(UnsupportedOperationException("Cloud playlists disabled"))
 
-    /**
-     * Adds tracks to a playlist. Succeeds with the per-entry ids YouTube minted
-     * for them — see [Innertube.addToPlaylist]. A caller with nothing on screen
-     * to update can ignore the map; one splicing the row into a playlist it is
-     * looking at needs it for the row's "remove".
-     */
     suspend fun addToPlaylist(
         playlistId: String,
         videoIds: List<String>,
-    ): Result<Map<String, String>> =
-        call("playlist:add") { Innertube.addToPlaylist(playlistId, videoIds) }
+    ): Result<Map<String, String>> = Result.success(emptyMap())
 
-    /** [entries] are (setVideoId, videoId) pairs — see [Song.setVideoId]. */
     suspend fun removeFromPlaylist(
         playlistId: String,
         entries: List<Pair<String, String>>,
-    ): Result<Unit> = call("playlist:remove") {
-        Innertube.removeFromPlaylist(playlistId, entries)
-    }
+    ): Result<Unit> = Result.success(Unit)
 
-    /**
-     * A playlist's entries in their current order, every page of them, for
-     * rearranging.
-     *
-     * Fetched fresh rather than read off the open page, because a reorder is
-     * sent as moves relative to neighbours (see [playlistMoves]) and a list
-     * that stops short of the end — the open page while it is still filling
-     * in — would send the last row it has "to the end" past rows it never saw.
-     * Fails when an entry comes back without the set-video-id a move has to
-     * name, rather than offering to reorder something it can't.
-     */
-    suspend fun playlistEntries(browseId: String): Result<List<Song>> = call("entries:$browseId") {
-        val out = LinkedHashMap<String, Song>()
-        var response = Innertube.browse(browseId)
-        var page = 1
-        while (true) {
-            val shelf = InnertubeParser.parsePlaylistShelf(response) ?: break
-            shelf.songs.forEach { song ->
-                val setVideoId = song.setVideoId ?: error("playlist entry without an id")
-                out.putIfAbsent(setVideoId, song)
-            }
-            val token = shelf.continuation ?: break
-            // Same cap as [songsPaged] — a playlist past it can't be listed
-            // whole, and a partial list can't be reordered safely.
-            if (page++ >= MAX_PAGES) error("playlist too long to reorder")
-            response = Innertube.browseContinuation(token)
-        }
-        out.values.toList()
-    }
+    suspend fun playlistEntries(browseId: String): Result<List<Song>> = Result.success(emptyList())
 
-    /**
-     * Rearranges a playlist from [current] to [target], both its entries'
-     * set-video-ids — see [playlistMoves]. Sent in batches so a large
-     * rearrangement doesn't become one oversized request.
-     */
     suspend fun reorderPlaylist(
         playlistId: String,
         current: List<String>,
         target: List<String>,
-    ): Result<Unit> = call("playlist:reorder") {
-        playlistMoves(current, target).chunked(MOVE_BATCH).forEach { batch ->
-            Innertube.movePlaylistItems(playlistId, batch)
-        }
-    }
+    ): Result<Unit> = Result.success(Unit)
 
-    private const val MOVE_BATCH = 50
+    suspend fun renamePlaylist(playlistId: String, title: String): Result<Unit> = Result.success(Unit)
 
-    suspend fun renamePlaylist(playlistId: String, title: String): Result<Unit> =
-        call("playlist:rename") { Innertube.renamePlaylist(playlistId, title) }
-
-    suspend fun deletePlaylist(playlistId: String): Result<Unit> =
-        call("playlist:delete") { Innertube.deletePlaylist(playlistId) }
+    suspend fun deletePlaylist(playlistId: String): Result<Unit> = Result.success(Unit)
 
     /**
      * Artist page. The landing page only lists ~5 songs, so the linked

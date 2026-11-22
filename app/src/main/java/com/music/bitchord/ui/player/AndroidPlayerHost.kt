@@ -17,9 +17,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.data.canvas.CanvasRepository
-import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.lyrics.LyricLine
-import com.music.bitchord.data.lyrics.LyricsTranslation
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.LastPlayerScreen
@@ -82,7 +80,6 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         override val reduceDynamicBlur get() = AppSettings.reduceDynamicBlur
         override val disableBlendEffects get() = AppSettings.disableBlendEffects
         override val showNerdStats get() = AppSettings.showNerdStats
-        override val showListenTogetherButton get() = AppSettings.showListenTogetherButton
         override val smartAnalysis get() = AppSettings.smartAnalysis
         override val automixDetail get() = AppSettings.automixDetail
         override val smartFadeEnabled get() = AppSettings.smartFadeEnabled
@@ -94,7 +91,7 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         override val smartTransitionWindow get() = AppSettings.smartTransitionWindow
         override val spotifyCanvasAutoHide get() = AppSettings.spotifyCanvasAutoHide
         override val syncedLyrics get() = AppSettings.syncedLyrics
-        override val translationLanguage get() = AppSettings.translationLanguage
+        override val translationLanguage = MutableStateFlow("")
         override val versionAlignmentInProgress get() = AppSettings.versionAlignmentInProgress
 
         override fun setLastPlayerScreen(value: LastPlayerScreen) = AppSettings.setLastPlayerScreen(value)
@@ -179,33 +176,19 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         )
     }
 
-    override val party: StateFlow<PartyUi> by lazy {
-        ListenTogether.state
-            .map { it.toPartyUi() }
-            .stateIn(scope, SharingStarted.Eagerly, ListenTogether.state.value.toPartyUi())
-    }
+    override val party: StateFlow<PartyUi> = MutableStateFlow(PartyUi())
 
     override suspend fun translateLyrics(
         trackId: String,
         lines: List<LyricLine>,
         targetLanguageTag: String,
-    ): LyricsTranslationResult =
-        when (val result = LyricsTranslation.translate(trackId, lines, targetLanguageTag)) {
-            is LyricsTranslation.Result.Translated -> LyricsTranslationResult.Translated(result.lines)
-            is LyricsTranslation.Result.SameLanguage -> LyricsTranslationResult.SameLanguage(result.language)
-            LyricsTranslation.Result.Unavailable -> LyricsTranslationResult.Unavailable
-        }
+    ): LyricsTranslationResult = LyricsTranslationResult.Unavailable
 
     override suspend fun romanizeLyrics(
         trackId: String,
         lines: List<LyricLine>,
         targetLanguageTag: String,
-    ): LyricsRomanizationResult =
-        when (val result = LyricsTranslation.romanize(trackId, lines, targetLanguageTag)) {
-            is LyricsTranslation.RomanizationResult.Romanized -> LyricsRomanizationResult.Romanized(result.lines)
-            LyricsTranslation.RomanizationResult.AlreadyRomanized -> LyricsRomanizationResult.AlreadyRomanized
-            LyricsTranslation.RomanizationResult.Unavailable -> LyricsRomanizationResult.Unavailable
-        }
+    ): LyricsRomanizationResult = LyricsRomanizationResult.Unavailable
 
     override fun showMessage(message: String) {
         main.post { Toast.makeText(app, message, Toast.LENGTH_SHORT).show() }
@@ -273,14 +256,6 @@ private fun AudioOutputStatus.Snapshot.toOutputFormat(bitPerfect: BitPerfectOutp
         dacLimited = dacLimited,
     )
 }
-
-private fun ListenTogether.State.toPartyUi() = PartyUi(
-    inParty = inParty,
-    controlsLocked = controlsLocked,
-    members = members,
-    you = you,
-    code = code,
-)
 
 /**
  * The volume bar's level: the receiver's while the music is on one, the DAC's

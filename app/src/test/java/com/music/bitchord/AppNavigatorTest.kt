@@ -45,19 +45,12 @@ class AppNavigatorTest {
     @Test
     fun backUnwindsAPlaylistOpenedFromSpotifyUnderSettings() {
         navigator.push(AppRoute.Settings)
-        navigator.push(AppRoute.AccountScrobbling)
-        navigator.push(AppRoute.Spotify)
-        releases += "spotify:playlist"
+        navigator.push(AppRoute.Equalizer)
         releases += "artist"
         assertNull(navigator.visibleEntry())
 
         assertTrue(navigator.pop())
-        assertEquals(listOf("spotify:playlist"), releases)
-        assertNull(navigator.visibleRoute())
-        assertTrue(navigator.pop())
-        assertEquals(AppRoute.Spotify, navigator.visibleRoute())
-        assertTrue(navigator.pop())
-        assertEquals(AppRoute.AccountScrobbling, navigator.visibleRoute())
+        assertEquals(AppRoute.Equalizer, navigator.visibleRoute())
         assertTrue(navigator.pop())
         assertEquals(AppRoute.Settings, navigator.visibleRoute())
         assertTrue(navigator.pop())
@@ -98,25 +91,25 @@ class AppNavigatorTest {
     @Test
     fun pushAllStartsFromWhicheverRouteIsShowing() {
         navigator.push(AppRoute.Settings)
-        navigator.pushAll(AppRoute.Settings, AppRoute.ListenTogether)
-        assertEquals(listOf(AppRoute.Settings, AppRoute.ListenTogether), navigator.entries.map { it.route })
-        navigator.pushAll(AppRoute.Settings, AppRoute.ListenTogether)
+        navigator.pushAll(AppRoute.Settings, AppRoute.Equalizer)
+        assertEquals(listOf(AppRoute.Settings, AppRoute.Equalizer), navigator.entries.map { it.route })
+        navigator.pushAll(AppRoute.Settings, AppRoute.Equalizer)
         assertEquals(2, navigator.entries.size)
     }
 
     @Test
     fun clearAndResetLeaveNothingBehind() {
-        navigator.push(AppRoute.Spotify)
-        releases += "spotify:playlist"
+        navigator.push(AppRoute.Downloads)
+        releases += "album"
         navigator.clear()
         assertTrue(navigator.entries.isEmpty())
         assertTrue(releases.isEmpty())
         assertFalse(navigator.pop())
 
         releases += "album"
-        navigator.reset(AppRoute.Settings, AppRoute.ListenTogether)
+        navigator.reset(AppRoute.Settings, AppRoute.Equalizer)
         assertTrue(releases.isEmpty())
-        assertEquals(AppRoute.ListenTogether, navigator.visibleRoute())
+        assertEquals(AppRoute.Equalizer, navigator.visibleRoute())
     }
 
     @Test

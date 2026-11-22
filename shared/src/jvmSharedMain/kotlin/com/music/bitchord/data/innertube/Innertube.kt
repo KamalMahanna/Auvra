@@ -880,51 +880,14 @@ object Innertube {
      * status line alone will happily report a rating that never happened.
      */
     suspend fun rate(videoId: String, status: LikeStatus) {
-        requireSession()
-        val endpoint = when (status) {
-            LikeStatus.LIKE -> "like/like"
-            LikeStatus.DISLIKE -> "like/dislike"
-            LikeStatus.INDIFFERENT -> "like/removelike"
-        }
-        val response = postMusic(endpoint) {
-            putJsonObject("target") { put("videoId", videoId) }
-        }
-        response["error"]?.let { error ->
-            val message = error.jsonObject["message"]?.jsonPrimitive?.contentOrNull
-            error("YouTube Music refused the rating: ${message ?: error}")
-        }
-        // YouTube states what it did in the toast it would have shown. Worth
-        // keeping: a rating it declines to act on still answers 200, and this
-        // one line is the difference between "the call was made" and "the
-        // call did something".
-        Log.d(TAG, "$endpoint $videoId -> ${findString(response, "text") ?: "no confirmation"}")
+        // Remote account liking disabled
     }
 
     /**
      * Saves an album or playlist to the library, or takes it back out.
-     *
-     * The same endpoints [rate] uses, aimed at a playlist instead of a video:
-     * YouTube has no separate "save" verb for a release — a saved album *is* a
-     * liked one, which is why the Library tab's Albums and Playlists shelves and
-     * the account's likes are the same list. [playlistId] is the id the page
-     * itself named, not its browse id; see
-     * [com.music.bitchord.data.model.LibraryState].
-     *
-     * No dislike half, unlike [rate]: nothing in YouTube Music reads a disliked
-     * release, so the only two states worth expressing are saved and not.
      */
     suspend fun ratePlaylist(playlistId: String, saved: Boolean) {
-        requireSession()
-        val endpoint = if (saved) "like/like" else "like/removelike"
-        val response = postMusic(endpoint) {
-            putJsonObject("target") { put("playlistId", playlistId) }
-        }
-        // As in [rate]: a refusal arrives as HTTP 200 with an error in the body.
-        response["error"]?.let { error ->
-            val message = error.jsonObject["message"]?.jsonPrimitive?.contentOrNull
-            error("YouTube Music refused the change: ${message ?: error}")
-        }
-        Log.d(TAG, "$endpoint $playlistId -> ${findString(response, "text") ?: "no confirmation"}")
+        // Remote playlist saving disabled
     }
 
     /**
@@ -975,134 +938,22 @@ object Innertube {
         privacy: PlaylistPrivacy,
         description: String? = null,
         videoIds: List<String> = emptyList(),
-    ): String {
-        requireSession()
-        val response = postMusic("playlist/create") {
-            put("title", title)
-            put("description", description.orEmpty())
-            put("privacyStatus", privacy.apiValue)
-            if (videoIds.isNotEmpty()) {
-                putJsonArray("videoIds") { videoIds.forEach { add(it) } }
-            }
-        }
-        // Normally a bare top-level id; occasionally only inside the command
-        // that would navigate the web client to the new page, so fall back to
-        // finding it by name rather than by a path that would rot.
-        return response["playlistId"]?.jsonPrimitive?.contentOrNull
-            ?: findString(response, "playlistId")
-            ?: error("playlist created but no id came back")
-    }
+    ): String = error("Cloud playlists disabled")
 
-    suspend fun deletePlaylist(playlistId: String) {
-        requireSession()
-        postMusic("playlist/delete") { put("playlistId", playlistId.removePrefix("VL")) }
-    }
+    suspend fun deletePlaylist(playlistId: String) {}
 
-    /**
-     * One or more edits to a playlist, applied together.
-     *
-     * The endpoint answers `STATUS_SUCCEEDED` rather than an HTTP error when
-     * it refuses — a playlist the account merely saved rather than owns is
-     * the usual reason — so the body is checked as well as the status line.
-     */
     private suspend fun editPlaylist(
         playlistId: String,
         actions: JsonArrayBuilder.() -> Unit,
-    ): JsonObject {
-        requireSession()
-        val response = postMusic("browse/edit_playlist") {
-            // The edit endpoint takes the raw id; `VL` is the browse prefix.
-            put("playlistId", playlistId.removePrefix("VL"))
-            putJsonArray("actions", actions)
-        }
-        val status = response["status"]?.jsonPrimitive?.contentOrNull
-        if (status != null && status != "STATUS_SUCCEEDED") {
-            error("YouTube Music refused the edit ($status)")
-        }
-        return response
-    }
+    ): JsonObject = JsonObject(emptyMap())
 
-    /**
-     * Adds tracks to a playlist, and reports the per-entry id each one landed
-     * under — video id to set-video-id, for the tracks the response named.
-     *
-     * Worth reading rather than discarding, because it is the only chance to
-     * learn it without re-fetching the whole playlist: a set-video-id is minted
-     * by this call, and it is what a later removal has to be expressed in (see
-     * [removeFromPlaylist]). A row added to a playlist already on screen is
-     * otherwise one the user can see but not take back out until the page is
-     * reopened.
-     *
-     * Absences are normal and not an error — the add still happened; only the
-     * id for undoing it is unknown.
-     */
-    suspend fun addToPlaylist(playlistId: String, videoIds: List<String>): Map<String, String> {
-        val response = editPlaylist(playlistId) {
-            videoIds.forEach { videoId ->
-                addJsonObject {
-                    put("action", "ACTION_ADD_VIDEO")
-                    put("addedVideoId", videoId)
-                }
-            }
-        }
-        return (response["playlistEditResults"] as? JsonArray)
-            .orEmpty()
-            .mapNotNull { result ->
-                val added = (result as? JsonObject)
-                    ?.get("playlistEditVideoAddedResultData") as? JsonObject
-                    ?: return@mapNotNull null
-                val videoId = (added["videoId"] as? JsonPrimitive)?.contentOrNull
-                    ?: return@mapNotNull null
-                val setVideoId = (added["setVideoId"] as? JsonPrimitive)?.contentOrNull
-                    ?: return@mapNotNull null
-                videoId to setVideoId
-            }
-            .toMap()
-    }
+    suspend fun addToPlaylist(playlistId: String, videoIds: List<String>): Map<String, String> = emptyMap()
 
-    /**
-     * Removes entries from a playlist. Keyed by set-video-id as well as video
-     * id: the same track added twice is two entries, and only the pair says
-     * which of them to drop.
-     */
-    suspend fun removeFromPlaylist(playlistId: String, entries: List<Pair<String, String>>) {
-        editPlaylist(playlistId) {
-            entries.forEach { (setVideoId, videoId) ->
-                addJsonObject {
-                    put("action", "ACTION_REMOVE_VIDEO")
-                    put("setVideoId", setVideoId)
-                    put("removedVideoId", videoId)
-                }
-            }
-        }
-    }
+    suspend fun removeFromPlaylist(playlistId: String, entries: List<Pair<String, String>>) {}
 
-    /**
-     * Rearranges a playlist, one [PlaylistMove] after another in the order
-     * given — see [com.music.bitchord.data.model.playlistMoves] for building
-     * them. A move with no successor goes to the end.
-     */
-    suspend fun movePlaylistItems(playlistId: String, moves: List<PlaylistMove>) {
-        if (moves.isEmpty()) return
-        editPlaylist(playlistId) {
-            moves.forEach { move ->
-                addJsonObject {
-                    put("action", "ACTION_MOVE_VIDEO_BEFORE")
-                    put("setVideoId", move.setVideoId)
-                    move.before?.let { put("movedSetVideoIdSuccessor", it) }
-                }
-            }
-        }
-    }
+    suspend fun movePlaylistItems(playlistId: String, moves: List<PlaylistMove>) {}
 
-    suspend fun renamePlaylist(playlistId: String, title: String) {
-        editPlaylist(playlistId) {
-            addJsonObject {
-                put("action", "ACTION_SET_PLAYLIST_NAME")
-                put("playlistName", title)
-            }
-        }
-    }
+    suspend fun renamePlaylist(playlistId: String, title: String) {}
 
     /** A fresh client-playback-nonce, identifying one play of one track. */
     fun newCpn(): String = (1..16).map { CPN_ALPHABET.random() }.joinToString("")

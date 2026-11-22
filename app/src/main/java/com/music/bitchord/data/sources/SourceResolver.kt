@@ -1150,30 +1150,6 @@ object SourceResolver {
             if (requireSharedArtist) {
                 matches = matches.filter { TrackMatcher.sharesArtist(matchOn.artist, it.artist) }
             }
-            // JioSaavn can return different audio under the same title and
-            // artist on different releases. With no album on the requested
-            // track there is no honest way to choose between those rows;
-            // duration is not enough when the wrong recording is only a
-            // second away. Treat it as this source missing and retain the
-            // known-correct fallback.
-            if (source.kind == SourceKind.JIOSAAVN &&
-                TrackMatcher.hasConflictingAlbums(matches, matchOn)
-            ) {
-                val canonical = TrackMatcher.uniquelyMostCreditedCloseMatch(matches, matchOn)
-                if (canonical == null) {
-                    TrackLog.w(
-                        TAG,
-                        "${source.displayName} returned conflicting albums for '${matchOn.title}'; refusing to guess",
-                    )
-                    continue
-                }
-                TrackLog.d(
-                    TAG,
-                    "${source.displayName} resolved conflicting albums for '${matchOn.title}' " +
-                        "using the uniquely fullest credit: '${canonical.artist}'",
-                )
-                matches = listOf(canonical)
-            }
             // The extra bar for standing in for one specific recording: the
             // replacement has to be the same *length*, to the second or so. A
             // title and an artist can agree across two different edits of a

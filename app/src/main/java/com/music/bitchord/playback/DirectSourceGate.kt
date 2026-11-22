@@ -3,7 +3,6 @@ package com.music.bitchord.playback
 import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.TrackLog
 import com.music.bitchord.data.YtMusicRepository
-import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.sources.SourceResolver
 import com.music.bitchord.data.sources.SourceStream
@@ -82,7 +81,7 @@ object DirectSourceGate {
      * until the window opens would leave this phone behind the others.
      */
     fun isActive(): Boolean =
-        AppSettings.directSourceStream.value && !ListenTogether.state.value.inParty &&
+        AppSettings.directSourceStream.value &&
             SourceResolver.directAddons().isNotEmpty()
 
     private data class Open(val playing: Set<String>, val next: String?)
@@ -125,8 +124,8 @@ object DirectSourceGate {
     suspend fun awaitOpen(mediaId: String) {
         if (bypass.get() == true || !isActive() || open.value.admits(mediaId)) return
         TrackLog.d(TAG, "holding $mediaId until it is within ${WINDOW_MS / 1000}s of playing", about = mediaId)
-        combine(open, AppSettings.directSourceStream, ListenTogether.state) { state, on, party ->
-            !on || party.inParty || state.admits(mediaId)
+        combine(open, AppSettings.directSourceStream) { state, on ->
+            !on || state.admits(mediaId)
         }
             .first { it }
         TrackLog.d(TAG, "released $mediaId", about = mediaId)

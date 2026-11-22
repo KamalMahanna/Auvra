@@ -86,34 +86,7 @@ internal object SpotifyToken {
      * enough.
      */
     suspend fun accessToken(): String? {
-        val cookie = AppSettings.spotifySpdcToken.value
-        if (cookie.isBlank()) return null
-
-        val now = System.currentTimeMillis()
-        cachedAccessToken?.let { if (now < accessTokenExpiresAtMs - 30_000) return it }
-
-        return harvestMutex.withLock {
-            val stillNow = System.currentTimeMillis()
-            cachedAccessToken?.let { if (stillNow < accessTokenExpiresAtMs - 30_000) return@withLock it }
-
-            val context = appContext
-            if (context == null) {
-                Log.w(TAG, "SpotifyToken.init was never called; no context for the harvest")
-                return@withLock null
-            }
-
-            val harvested = withContext(Dispatchers.Main) { harvestViaWebView(context, cookie) }
-            if (harvested == null) {
-                Log.w(TAG, "token harvest failed or timed out")
-                return@withLock null
-            }
-
-            cachedAccessToken = harvested.token
-            accessTokenExpiresAtMs = harvested.expiresAt
-            harvested.clientId?.let { cachedClientId = it }
-            Log.d(TAG, "harvested access token, good until ${java.util.Date(harvested.expiresAt)}")
-            harvested.token
-        }
+        return null
     }
 
     /**

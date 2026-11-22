@@ -6,9 +6,6 @@
     <!-- Always-on: keeps the player up while the screen is dimmed. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- The watch-face icon while the phone plays (NowPlayingListener). -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
     <!-- The watch as the speaker: WatchPlaybackService plays on with the screen off. -->
     <!-- Updates sent from the phone's "BitChord for Wear OS" settings (SelfUpdate). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

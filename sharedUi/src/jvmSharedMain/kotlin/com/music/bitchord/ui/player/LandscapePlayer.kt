@@ -33,7 +33,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
-import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -392,10 +392,13 @@ internal fun LandscapeMainPane(
 internal fun LandscapeCredits(
     song: Song,
     signedIn: Boolean,
-    likeStatus: LikeStatus,
+    isDownloaded: Boolean = false,
+    onDownload: () -> Unit = {},
+    onSongInfo: () -> Unit = {},
+    likeStatus: LikeStatus = LikeStatus.INDIFFERENT,
     /** The menu glyph is briefly the undo arrow after a quality upgrade. */
     showRevertCue: Boolean,
-    onToggleLike: () -> Unit,
+    onToggleLike: () -> Unit = {},
     onOpenMenu: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     /** Null browse id for anyone but the lead credit — see [NowPlayingScreen]. */
@@ -423,7 +426,7 @@ internal fun LandscapeCredits(
                     } else {
                         null
                     },
-                    modifier = Modifier.opensPage(song.albumId, onOpenAlbum),
+                    modifier = Modifier.opensPage(song.albumId, onOpenAlbum, onLongClick = onSongInfo),
                 )
                 Spacer(Modifier.height(2.dp))
                 ArtistCreditsMarquee(
@@ -441,28 +444,15 @@ internal fun LandscapeCredits(
             }
         }
         Spacer(Modifier.width(10.dp))
-        // Same gate as the portrait player's: no account to like against for a
-        // guest — but a local file or a finished download is liked on the
-        // device, which needs none.
-        if (signedIn || song.localUri != null) {
-            val liked = likeStatus == LikeStatus.LIKE
-            CircleGlyph(
-                icon = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
-                contentDescription = stringResource(
-                    if (liked) Res.string.remove_from_liked else Res.string.like,
-                ),
-                onClick = onToggleLike,
-                active = liked,
-                haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
-            )
-            Spacer(Modifier.width(8.dp))
-        }
         CircleGlyph(
-            icon = if (showRevertCue) Icons.AutoMirrored.Rounded.Undo else Icons.Rounded.MoreHoriz,
-            contentDescription = stringResource(Res.string.more),
-            onClick = onOpenMenu,
-            modifier = Modifier.menuAnchor(),
+            icon = if (isDownloaded) Icons.Rounded.DownloadDone else BitChordIcons.Download,
+            contentDescription = stringResource(
+                if (isDownloaded) Res.string.downloaded else Res.string.download,
+            ),
+            onClick = onDownload,
+            active = isDownloaded,
         )
+
     }
 }
 
@@ -486,8 +476,6 @@ internal fun LandscapeLyricsPane(
     picking: Boolean = false,
     /** The pick bar itself, drawn in place of the row below. */
     pickBar: @Composable () -> Unit = {},
-    romanizationToggle: @Composable () -> Unit,
-    translationToggle: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     panel: @Composable (Modifier) -> Unit,
 ) {
@@ -513,26 +501,16 @@ internal fun LandscapeLyricsPane(
                 )
             }
         }
-        // While a pick is open the row below gives way to the bar: the two
-        // toggles in it would redraw the very lines the pick is indexing, and
+        // While a pick is open the row below gives way to the bar:
         // the status line is the one thing the bar's own Cancel and Share sit
         // where.
         if (picking) {
             Box(Modifier.fillMaxWidth()) { pickBar() }
         } else {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Fixed slots either side whether or not the toggles are drawn, so
-            // the status line stays centred as lyrics arrive.
-            Box(Modifier.size(34.dp)) { if (hasLyrics) romanizationToggle() }
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp),
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, start = 12.dp, end = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 LyricsStatusWithChange(
@@ -540,8 +518,6 @@ internal fun LandscapeLyricsPane(
                     onStatusClick = onStatusClick,
                 )
             }
-            Box(Modifier.size(34.dp)) { if (hasLyrics) translationToggle() }
-        }
         }
     }
 }

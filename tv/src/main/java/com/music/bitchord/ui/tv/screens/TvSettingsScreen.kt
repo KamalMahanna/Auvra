@@ -40,7 +40,6 @@ import com.music.bitchord.ui.tv.dialogs.TvAboutDialog
 import com.music.bitchord.ui.tv.dialogs.TvEqualizerDialog
 import com.music.bitchord.ui.tv.dialogs.TvLyricsSourcesDialog
 import com.music.bitchord.ui.tv.dialogs.TvRefreshRateDialog
-import com.music.bitchord.ui.tv.dialogs.TvScrobbleDialog
 import com.music.bitchord.data.settings.TvPlayerStyle
 import com.music.bitchord.ui.tv.dialogs.TvThemeDialog
 import com.music.bitchord.ui.tv.dialogs.TvUpdateDialog
@@ -50,8 +49,7 @@ import com.music.bitchord.ui.tv.theme.TvDimensions
 import com.music.bitchord.ui.tv.theme.TvGlass
 import com.music.bitchord.ui.tv.theme.TvType
 
-// Discord Rich Presence is hidden on TV for now; TvDiscordDialog is kept for when it returns.
-private enum class SettingsSheet { Theme, RefreshRate, Equalizer, Scrobbling, LyricsSources, Update, About }
+private enum class SettingsSheet { Theme, RefreshRate, Equalizer, LyricsSources, Update, About }
 
 private const val DefaultBlurb = "Playback, sound and display preferences for BitChord on this TV."
 
@@ -132,16 +130,6 @@ fun TvSettingsScreen(
             contentPadding = PaddingValues(end = TvDimensions.SafeMarginHorizontal, bottom = 38.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            item { TvListHeader("Account") }
-            item {
-                TvListRow(
-                    title = "YouTube Music",
-                    value = if (signedIn) account?.name ?: "Signed In" else "Sign In",
-                    onFocused = { blurb = "Your library, playlists and recommendations come from this account." },
-                    onClick = onOpenAccount,
-                )
-            }
-
             item { TvListHeader("Playback") }
             item {
                 TvListRow(
@@ -321,15 +309,6 @@ fun TvSettingsScreen(
                 )
             }
 
-            item { TvListHeader("Connections") }
-            item {
-                TvListRow(
-                    title = "Scrobbling",
-                    onFocused = { blurb = "Last.fm and ListenBrainz." },
-                    onClick = { sheet = SettingsSheet.Scrobbling },
-                )
-            }
-
             item { TvListHeader("General") }
             if (update != null) {
                 item {
@@ -363,7 +342,6 @@ fun TvSettingsScreen(
         SettingsSheet.Theme -> TvThemeDialog(onDismiss = { sheet = null })
         SettingsSheet.RefreshRate -> TvRefreshRateDialog(onDismiss = { sheet = null })
         SettingsSheet.Equalizer -> TvEqualizerDialog(onDismiss = { sheet = null })
-        SettingsSheet.Scrobbling -> TvScrobbleDialog(onDismiss = { sheet = null })
         SettingsSheet.LyricsSources -> TvLyricsSourcesDialog(onDismiss = { sheet = null })
         SettingsSheet.Update -> update?.let { TvUpdateDialog(update = it, onDismiss = { sheet = null }) }
         SettingsSheet.About -> TvAboutDialog(onDismiss = { sheet = null })

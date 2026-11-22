@@ -192,17 +192,6 @@ fun HomeScreen(
             if (title != null) {
                 item { HomeTitle(title, festiveLogo = festiveLogo, onFestiveLogoClick = onFestiveLogoClick) }
             }
-            if (!signedIn && onSignIn != null) {
-                item {
-                    // Read in this item, so a scroll starting or ending
-                    // recomposes the banner alone.
-                    SignInBanner(
-                        onSignIn = onSignIn,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                        motion = LocalArtworkMotion.current && !listState.isScrollInProgress,
-                    )
-                }
-            }
             if (onTopPickClick != null) {
                 when {
                     !topPicks.isNullOrEmpty() -> item(key = "top-picks") {

@@ -123,7 +123,7 @@ object ArtistFacts {
 
     /** Whether a genre chart can be drawn at all on this build and these settings. */
     val genresAvailable: Boolean
-        get() = AppSettings.replayGenres.value && BuildConfig.LASTFM_API_KEY.isNotBlank()
+        get() = false
 
     // ── Reading ─────────────────────────────────────────────────────────────
     //
@@ -228,33 +228,7 @@ object ArtistFacts {
         dirty = true
     }
 
-    private fun fetchGenres(name: String) {
-        val url = "https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags" +
-            "&artist=${Uri.encode(name)}" +
-            "&api_key=${Uri.encode(BuildConfig.LASTFM_API_KEY)}" +
-            "&autocorrect=1&format=json"
-        val request = Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
-        val body = Http.client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return
-            response.body?.string()
-        } ?: return
-
-        val tags = runCatching {
-            Json.parseToJsonElement(body).jsonObject["toptags"]
-                ?.jsonObject?.get("tag")?.jsonArray
-                ?.mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.content }
-        }.getOrNull().orEmpty()
-
-        val genres = tags.asSequence()
-            .mapNotNull { canonical(it) }
-            .distinct()
-            .take(MAX_GENRES_PER_ARTIST)
-            .toList()
-
-        val entry = known[key(name)] ?: StoredArtist(key = key(name))
-        known[key(name)] = entry.copy(genres = genres, genresAt = System.currentTimeMillis())
-        dirty = true
-    }
+    private fun fetchGenres(name: String) {}
 
     /**
      * A tag as a genre, or null if it isn't one.
