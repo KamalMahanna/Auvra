@@ -60,9 +60,7 @@ android {
             "ADDON_AUTH_URL",
             "\"${addonAuthServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
         )
-        // Which release assets are this app's: the phone and TV APKs ship in
-        // the same GitHub release, told apart by file name. See
-        // AppUpdateChecker.apkAssetUrl.
+        // Which release assets are this app's. See AppUpdateChecker.apkAssetUrl.
         buildConfigField("String", "UPDATE_APK_PREFIX", "\"BitChord-\"")
     }
 

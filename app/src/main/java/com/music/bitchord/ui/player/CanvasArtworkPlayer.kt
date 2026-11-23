@@ -262,7 +262,6 @@ internal fun AndroidCanvasArtworkPlayer(
                 repeatMode = Player.REPEAT_MODE_ONE
                 trackSelectionParameters = trackSelectionParameters.buildUpon()
                     .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
-                    .apply { CanvasPlaybackLimits.maxFrameRate?.let(::setMaxVideoFrameRate) }
                     .build()
             }
     }
@@ -971,14 +970,4 @@ internal fun AndroidCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
         onStillCaptured = spec.onStillCaptured,
         onResumed = spec.onResumed,
     )
-}
-
-/**
- * A ceiling on the frame rate canvas videos are decoded at, or null for none.
- * Left unset on the phone; the Android TV app sets it, where a looping 60 fps
- * clip behind the player costs GPU the television does not have to spare.
- */
-object CanvasPlaybackLimits {
-    @Volatile
-    var maxFrameRate: Int? = null
 }

@@ -94,15 +94,12 @@ object AppUpdateChecker {
     }
 
     /**
-     * One release carries the phone app and the TV app, each as a universal
-     * APK plus per-ABI splits:
+     * Releases carry universal APKs plus per-ABI splits:
      *
      *     BitChord-v1.8.apk     BitChord-v1.8_arm64-v8a.apk     ...
-     *     BitChordTV-v1.8.apk   BitChordTV-v1.8_arm64-v8a.apk   ...
      *
      * so this app's APKs are the ones named with its own
-     * [BuildConfig.UPDATE_APK_PREFIX] — "BitChord-" never matches a TV file,
-     * since the prefix ends at the hyphen. The universal build (no `_ABI`
+     * [BuildConfig.UPDATE_APK_PREFIX]. The universal build (no `_ABI`
      * suffix) is taken first, as it installs anywhere; failing that, the split
      * for this device's ABI. A release with neither leaves
      * [UpdateInfo.apkUrl] null and the UI falls back to opening the releases
@@ -197,7 +194,7 @@ object AppUpdateChecker {
      * Sideloaded apps need the user's blessing per app ("install unknown apps");
      * without it the installer intent silently does nothing on most ROMs, so
      * the user is sent to that one switch first and taps Install again after.
-     * Some TV builds have no such settings screen; there the installer is
+     * Some builds have no such settings screen; there the installer is
      * launched anyway and shows its own "not allowed" prompt with a way in.
      */
     fun installApk(context: Context, file: File) {

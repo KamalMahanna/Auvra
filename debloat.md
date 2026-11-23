@@ -155,3 +155,18 @@ This document tracks all features, subsystems, UI screens, network services, thi
 - **Cleaned Up Equalizer Presets Route:** Removed dummy `EqualizerPresetPage` stub from `EqualizerScreen.kt`, removed `onOpenPresets` parameter, and removed `AppRoute.EqualizerPresets` from `AppNavigator.kt` and `MainActivity.kt`.
 - **Cleaned Up Unused Imports:** Removed unused `ConfirmationAlert` and `ChoiceAlert` imports from `MainActivity.kt`, and cleaned over 100 unused imports across `MainActivity.kt`, `PlaybackService.kt`, `MainViewModel.kt`, `SettingsSheet.kt`, `TvSettingsScreen.kt`, and `TvSongActionsDialog.kt`.
 - **Updated Repository & Update Links to Auvra:** Retargeted GitHub repository URLs and in-app release update endpoint in `AppUpdateChecker.kt` (`LATEST_RELEASE_URL`), `BitChordApplication.kt`, `README.md`, and backend/web scripts to `KamalMahanna/Auvra`.
+
+---
+
+## 8. Android TV Module & Implementation (Completely Purged)
+- **Deleted TV Application Module:**
+  - Completely deleted the entire `tv/` directory containing the standalone Android TV / Google TV application (`tv/build.gradle.kts`, `tv/README.md`, `TvActivity.kt`, `TvApp.kt`, TV Leanback launcher, UI screens, dialogs, components, resources, and tests).
+- **Deleted TV CI/CD Pipeline:**
+  - Removed `.github/workflows/tv.yml` workflow file used to build and upload TV development APKs.
+- **Removed Gradle Configuration:**
+  - Removed `include(":tv")` from `settings.gradle.kts`, eliminating the TV project target from Gradle builds and syncs.
+- **Purged TV Hooks & Dead Code in Mobile App:**
+  - Removed `extraLocalMusic` USB external storage scan hook from `LocalMediaRepository.kt` which was only used by the Android TV app.
+  - Removed `CanvasPlaybackLimits` max frame rate throttle from `CanvasArtworkPlayer.kt` which was only configured for TV hardware constraints.
+  - Removed unused `NoSpeaker` remote speaker stub from `RemoteSpeaker.kt`.
+  - Cleaned up TV release asset comments and installer behavior notes from `app/build.gradle.kts` and `AppUpdateChecker.kt`.
