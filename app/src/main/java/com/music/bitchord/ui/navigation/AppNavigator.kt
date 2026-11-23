@@ -36,9 +36,6 @@ sealed interface AppRoute {
 
     /** One category of Settings, opened from its row on the main Settings page. */
     data class SettingsSection(val category: SettingsCategory) : AppRoute
-
-    /** The Equalizer's list of preset curves. */
-    data object EqualizerPresets : AppRoute
 }
 
 /**

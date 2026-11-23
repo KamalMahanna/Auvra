@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.tv
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -34,12 +36,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -258,8 +258,7 @@ private fun TvMainShell(
     val returnFocus = remember { mutableListOf<FocusRequester?>() }
 
     val signedIn by viewModel.signedIn.collectAsState()
-    val activeProfileId by viewModel.activeProfileId.collectAsState()
-    LaunchedEffect(signedIn, activeProfileId) {
+    LaunchedEffect(signedIn) {
         if (!signedIn) {
             if (detailStack.isNotEmpty()) {
                 detailStack.clear()

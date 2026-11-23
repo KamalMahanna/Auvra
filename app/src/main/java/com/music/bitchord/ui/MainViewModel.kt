@@ -17,27 +17,19 @@ import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
 import android.util.Log
 import java.io.File
-import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
-import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
-import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
-import com.music.bitchord.data.spotify.SpotifyImporter
 import com.music.bitchord.data.lyrics.EmbeddedLyrics
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsRepository
 import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.navigation.AppNavigator
-import com.music.bitchord.data.innertube.Innertube
 import com.music.bitchord.data.innertube.PlaybackTracker
 import com.music.bitchord.data.innertube.StreamResolver
-import com.music.bitchord.auth.CapturedSession
-import com.music.bitchord.auth.WebSessionMode
 import com.music.bitchord.data.model.Account
-import com.music.bitchord.data.model.AccountChannel
 import com.music.bitchord.data.model.BrowseType
 import com.music.bitchord.data.model.DetailPage
 import com.music.bitchord.data.model.HomeShelf
@@ -52,7 +44,6 @@ import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
-import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.SubscriptionState
 import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.UserPlaylist
@@ -546,32 +537,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _account = MutableStateFlow<Account?>(null)
     val account: StateFlow<Account?> = _account.asStateFlow()
 
-    /**
-     * The channels this login can act as. Empty until the picker asks for
-     * them — it is one more request per sign-in and nothing else on the
-     * settings page needs the answer.
-     */
-    private val _channels = MutableStateFlow<List<AccountChannel>>(emptyList())
-    val channels: StateFlow<List<AccountChannel>> = _channels.asStateFlow()
-
-    private val _channelsLoading = MutableStateFlow(false)
-    val channelsLoading: StateFlow<Boolean> = _channelsLoading.asStateFlow()
-
-    /**
-     * The chosen channel's [AccountChannel.key], or null while the app is
-     * acting as whichever channel YouTube Music serves by default.
-     */
-    private val _selectedChannelKey = MutableStateFlow<String?>(null)
-    val selectedChannelKey: StateFlow<String?> = _selectedChannelKey.asStateFlow()
-
-    private val _selectedChannelName = MutableStateFlow<String?>(null)
-    val selectedChannelName: StateFlow<String?> = _selectedChannelName.asStateFlow()
-
-    private val _activeAccountId = MutableStateFlow<String?>(null)
-    val activeAccountId: StateFlow<String?> = _activeAccountId.asStateFlow()
-    private val _activeProfileId = MutableStateFlow<String?>(null)
-    val activeProfileId: StateFlow<String?> = _activeProfileId.asStateFlow()
-
     private val _history = MutableStateFlow<UiState<List<Song>>>(UiState.Loading)
     val history: StateFlow<UiState<List<Song>>> = _history.asStateFlow()
 
@@ -665,60 +630,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun likeStatusOf(videoId: String): LikeStatus =
         likeStatuses.value[videoId] ?: LikeStatus.INDIFFERENT
 
-    /**
-     * Sets (or clears) the thumbs rating on [videoId].
-     *
-     * Written to the screen first and rolled back if YouTube refuses. A rating
-     * is a one-tap, low-stakes action taken while a song is playing; waiting
-     * on a round trip before the heart fills reads as the tap not having
-     * registered, and people tap again.
-     */
-    fun setLike(videoId: String, status: LikeStatus) {
-        val previous = likeStatusOf(videoId)
-        if (previous == status) return
-        LikeState.set(videoId, status)
-        if (status != LikeStatus.LIKE) dropFromLikedLists(videoId)
-    }
-
-    /**
-     * Takes an un-liked track out of the library as well, and reports whether
-     * it did.
-     *
-     * Liking and saving are two independent flags on YouTube's side, and
-     * clearing only the first leaves the song saved — still feeding the
-     * Library tab's Artists shelf, still in the library feeds, with nowhere
-     * left in this app to reach it and finish the job. Clearing the heart
-     * reads as "forget this song", so it clears both.
-     *
-     * The token is fetched here rather than taken from [songMenu] because the
-     * heart in the player never opens a menu, so there is often nothing
-     * cached to take. One extra request, on an action nobody performs in bulk.
-     * A song that was never saved has no removal token and this is a no-op.
-     */
-    private suspend fun forgetFromLibrary(videoId: String): Boolean {
-        val menu = YtMusicRepository.songMenu(videoId).getOrNull() ?: return false
-        val token = menu.removeFromLibraryToken?.takeIf { menu.inLibrary } ?: return false
-        if (YtMusicRepository.setLibraryStatus(token).isFailure) return false
-        // The menu may be the one on screen; don't leave it offering a
-        // removal that has already happened.
-        _songMenu.value = _songMenu.value?.copy(inLibrary = false)
-        return true
-    }
-
-    /**
-     * Takes an un-liked track out of the lists that exist *because* it was
-     * liked — the Library tab's Liked Music section, and the Liked Music page
-     * itself if it happens to be open.
-     *
-     * Marking the library stale isn't enough on its own: that only acts when
-     * the tab is next opened, and un-liking is nearly always done from inside
-     * one of these two lists, looking straight at the row. Leaving it there
-     * reads as the tap not having worked — the menu says "Like" again while
-     * the song sits in Liked Music.
-     *
-     * Only ever removes. A track liked from somewhere else doesn't get spliced
-     * into a list that YouTube orders for itself; the next fetch places it.
-     */
     private fun dropFromLikedLists(videoId: String) {
         val library = (_library.value as? UiState.Success)?.data
         if (library != null && library.likedSongs.any { it.videoId == videoId }) {
@@ -736,25 +647,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun listenerKey(): String? = null
+
+    /**
+     * Sets (or clears) the thumbs rating on [videoId].
+     *
+     * Written to the screen first and rolled back if YouTube refuses. A rating
+     * is a one-tap, low-stakes action taken while a song is playing; waiting
+     * on a round trip before the heart fills reads as the tap not having
+     * registered, and people tap again.
+     */
+    fun setLike(videoId: String, status: LikeStatus) {
+        val previous = likeStatusOf(videoId)
+        if (previous == status) return
+        LikeState.set(videoId, status)
+        if (status != LikeStatus.LIKE) dropFromLikedLists(videoId)
+    }
+
     /** The heart: liked becomes neutral, anything else becomes liked. */
     fun toggleLike(videoId: String) = setLike(
         videoId,
         if (likeStatusOf(videoId) == LikeStatus.LIKE) LikeStatus.INDIFFERENT else LikeStatus.LIKE,
     )
-
-    /** As [toggleLike], for the thumb-down. */
-    fun toggleDislike(videoId: String): LikeStatus? {
-        val previous = likeStatusOf(videoId)
-        setLike(
-            videoId,
-            if (previous == LikeStatus.DISLIKE) {
-                LikeStatus.INDIFFERENT
-            } else {
-                LikeStatus.DISLIKE
-            },
-        )
-        return likeStatusOf(videoId)
-    }
 
     /**
      * Saves the album or playlist [browseId] to the library, or takes it out.
@@ -833,43 +747,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /**
-     * The open track menu's account state, or null while it is still being
-     * fetched. Only one menu can be open at a time, so one slot is enough.
-     */
-    private val _songMenu = MutableStateFlow<SongMenu?>(null)
-    val songMenu: StateFlow<SongMenu?> = _songMenu.asStateFlow()
-
-    private var songMenuJob: Job? = null
-
     /** In-flight liked-library continuation sync — see [syncLikedMusic]. */
     private var likedSyncJob: Job? = null
-
-    /**
-     * Loads the account state behind an opening track menu — the library
-     * tokens, and any rating the response happens to state.
-     *
-     * The rating is only ever taken when it *adds* something: a LIKE or a
-     * DISLIKE the library couldn't have told us, such as a disliked track or
-     * one liked past the tenth page of Liked Music. An INDIFFERENT is
-     * discarded.
-     *
-     * That asymmetry is not fussiness. This lookup reads a watch queue, and a
-     * watch queue routinely renders a liked track with no rating on it at all;
-     * believing that silence downgraded songs sitting in Liked Music to
-     * "not liked" a beat after their menu opened — the label changing under
-     * the user, with no request sent and nothing removed.
-     */
-    fun loadSongMenu(videoId: String?) {
-        songMenuJob?.cancel()
-        _songMenu.value = null
-        if (videoId == null || !_signedIn.value) return
-        songMenuJob = viewModelScope.launch {
-            val menu = YtMusicRepository.songMenu(videoId).getOrNull() ?: return@launch
-            _songMenu.value = menu
-            LikeState.rememberStated(videoId, menu.likeStatus)
-        }
-    }
 
     /** The account's own playlists, for the picker and the library tab. */
     private val _playlists = MutableStateFlow<List<UserPlaylist>>(emptyList())
@@ -1010,11 +889,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 videoIds = listOfNotNull(song?.videoId),
             ).fold(
                 onSuccess = { playlistId ->
-                    // Nothing to look up for a playlist this account has just
-                    // made: it is the owner by construction, so its card is
-                    // editable the moment it appears rather than one request
-                    // after someone holds it.
-                    setPlaylistOwned("VL$playlistId", true)
                     libraryStale = true
                     val created = UserPlaylist(
                         playlistId = playlistId,
@@ -1269,79 +1143,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Whether [browseId] is a playlist this account can be asked to edit.
-     *
-     * Only ever yes for a playlist [playlistOwned] has confirmed the account
-     * made. "In this account's library" is not the same thing and cannot stand
-     * in for it: `FEmusic_liked_playlists` lists a playlist saved from someone
-     * else in exactly the shape it lists one this account created, so a lookup
-     * in [playlists] alone called a stranger's playlist editable and the menus
-     * offered Rename and Delete on it — neither of which YouTube would have
-     * honoured.
-     *
-     * Strict rather than permissive-until-proven, so that every surface gives
-     * the same answer for the same playlist. The permissive version was right on
-     * a playlist's own page — where the page load supplies the answer — and
-     * wrong on a card until that page had been opened once, which is a menu that
-     * changes its mind about what a playlist is depending on where it is held.
-     */
-    fun editablePlaylist(browseId: String?): UserPlaylist? {
-        if (browseId == null || _playlistOwned.value[browseId] != true) return null
-        return _playlists.value.firstOrNull { it.browseId == browseId }
-    }
-
-    /**
-     * Which playlists in this account's library the account actually made, by
-     * browse id — see
-     * [com.music.bitchord.data.innertube.InnertubeParser.parsePlaylistOwned].
-     * An id absent from the map is one nothing has asked about yet, which is not
-     * the same as a no.
-     *
-     * Observable, because the answer routinely arrives after whatever wanted it
-     * is already on screen: a card's menu opens with nothing fetched, and the
-     * rows that depend on this appear as [resolvePlaylistOwnership] answers.
-     */
-    private val _playlistOwned = MutableStateFlow<Map<String, Boolean>>(emptyMap())
-    val playlistOwned: StateFlow<Map<String, Boolean>> = _playlistOwned.asStateFlow()
-
-    /**
-     * Finds out who made the playlist at [browseId], if it isn't already known.
-     *
-     * Only the playlist's own page states this, so a surface that has no page —
-     * a card in the library, a search result — has to ask for one. Which is why
-     * this is on demand rather than swept up front: the alternative is a request
-     * per playlist every time the library loads, for a question most of them
-     * will never be asked.
-     *
-     * Silent about anything that isn't a playlist in this account's library.
-     * Nothing else can be renamed or deleted whatever the answer, so asking
-     * would be a request spent to rule out what was never on offer.
-     */
-    fun resolvePlaylistOwnership(browseId: String?) {
-        if (!_signedIn.value || browseId == null) return
-        if (browseId in _playlistOwned.value || browseId in ownershipInFlight) return
-        if (_playlists.value.none { it.browseId == browseId }) return
-        ownershipInFlight += browseId
-        viewModelScope.launch {
-            YtMusicRepository.playlistOwned(browseId).onSuccess { owned ->
-                if (owned != null) setPlaylistOwned(browseId, owned)
-            }
-            // Released either way. A failed lookup that stayed marked would
-            // never be retried, leaving Rename off the user's own playlist for
-            // the rest of the session over one dropped request.
-            ownershipInFlight -= browseId
-        }
-    }
-
-    /** Guards against a second lookup while the first is still out. */
-    private val ownershipInFlight = mutableSetOf<String>()
-
-    private fun setPlaylistOwned(browseId: String, owned: Boolean) {
-        _playlistOwned.value = _playlistOwned.value + (browseId to owned)
-    }
-
-
-    /**
      * Guards every account write. All of them are signed-in-only, and the UI
      * hides them for guests — this is the backstop for a session that expired
      * between the menu opening and the tap.
@@ -1374,7 +1175,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // Home's own requests, to the same host, for a page not yet opened.
         if (_signedIn.value) {
             loadLibrary()
-            loadAccount()
             loadPlaylists()
         }
         viewModelScope.launch {
@@ -1442,12 +1242,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (!isCurrentHomeLoad(identity, generation)) return@onSuccess
                 shelf?.let { publishHomeShelves(listOf(it), prepend = true) }
             }
-        }
-    }
-
-    private fun loadAccount() {
-        viewModelScope.launch {
-            _account.value = YtMusicRepository.account().getOrNull()
         }
     }
 
@@ -2633,11 +2427,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 else -> {
                     YtMusicRepository.browseSongs(browseId).fold(
                         onSuccess = { page ->
-                            // Free here — the page that returned these rows is
-                            // the one thing that states who made the playlist,
-                            // so its own menu never has to go and ask. Recorded
-                            // even when the listing came back empty.
-                            page.owned?.let { setPlaylistOwned(browseId, it) }
                             // Only for the caller that had nothing: a card's own
                             // title is what the user just tapped, and must not
                             // be swapped for the header's wording underneath them.
@@ -3017,53 +2806,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _detailStack.value = stack.dropLast(1)
         navigator.onDetailStackShrunk(_detailStack.value.size)
         return true
-    }
-
-    /**
-     * Loads the channel list, unless it is already in hand.
-     *
-     * @param force refetch even if it is — after a switch, since the list
-     *   itself reports which channel is active.
-     */
-    fun loadChannels(force: Boolean = false) {
-        if (!_signedIn.value) return
-        if (_channelsLoading.value) return
-        if (!force && _channels.value.isNotEmpty()) return
-        viewModelScope.launch {
-            _channelsLoading.value = true
-            YtMusicRepository.accountChannels()
-                .onSuccess {
-                    _channels.value = it
-                }
-            _channelsLoading.value = false
-        }
-    }
-
-    fun selectChannel(channel: AccountChannel) {}
-
-    private fun listenerKey(): String? = null
-
-    fun stepProfile(forward: Boolean): Boolean = false
-
-    fun signOut() {
-        Innertube.cookie = null
-        StreamResolver.onSessionChanged()
-        _signedIn.value = false
-        _account.value = null
-        Innertube.selectChannel(null, null)
-        _channels.value = emptyList()
-        _selectedChannelKey.value = null
-        _selectedChannelName.value = null
-        _activeAccountId.value = null
-        _activeProfileId.value = null
-        _library.value = UiState.Loading
-        likedSyncJob?.cancel()
-        LikeState.clear()
-        _playlists.value = emptyList()
-        _playlistOwned.value = emptyMap()
-        ownershipInFlight.clear()
-        _songMenu.value = null
-        loadHome()
     }
 
     private fun Throwable.friendly(): String = when {

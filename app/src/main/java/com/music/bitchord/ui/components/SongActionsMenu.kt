@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.components
 
-import com.music.bitchord.ui.icons.BrokenHeart
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import com.music.bitchord.ui.icons.SfIcons
 import com.music.bitchord.ui.components.trackArtSize
 import androidx.compose.ui.layout.ContentScale
@@ -32,12 +33,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,7 +107,6 @@ fun SongActionsMenu(
     onStartRadio: () -> Unit,
     onDownload: () -> Unit,
     onToggleLike: () -> Unit,
-    onToggleDislike: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     onOpenArtist: (String) -> Unit,
@@ -187,7 +185,6 @@ fun SongActionsMenu(
     // guaranteed to read against the panel.
     val palette = neutralMenuPalette()
     val liked = likeStatus == LikeStatus.LIKE
-    val disliked = likeStatus == LikeStatus.DISLIKE
     // A local file or a finished download has no YouTube identity behind it to
     // rate, save, queue into a playlist, fetch again, or share a link for.
     val isOffline = song.localUri != null
@@ -212,16 +209,6 @@ fun SongActionsMenu(
                         label = stringResource(R.string.like),
                         tint = if (liked) palette.accent else null,
                         onClick = onToggleLike,
-                    )
-                }
-                // No dislike for a device file: there is no recommendation
-                // feed on the device for one to steer.
-                if (signedIn && !isOffline) {
-                    IosMenuQuickAction(
-                        icon = if (disliked) BrokenHeart.Fill else BrokenHeart.Outline,
-                        label = stringResource(R.string.dislike),
-                        tint = if (disliked) palette.accent else null,
-                        onClick = onToggleDislike,
                     )
                 }
                 shareAction?.let {

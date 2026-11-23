@@ -20,8 +20,6 @@
     <string name="cast_casting">캐스팅 중</string>
     <string name="cast_connecting">연결 중…</string>
     <string name="cast_row_subtitle">Chromecast 및 Google Cast 스피커</string>
-    <string name="watch_output">워치</string>
-    <string name="watch_output_subtitle">워치의 스피커 또는 헤드폰에서 재생</string>
     <string name="channel_count">%1$d 채널</string>
     <string name="choose_lyrics_provider">가사 제공자 선택</string>
     <string name="clear">지우기</string>

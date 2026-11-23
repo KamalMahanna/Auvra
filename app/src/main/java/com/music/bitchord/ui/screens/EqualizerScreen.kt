@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.screens
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -10,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -27,7 +28,6 @@ import com.music.bitchord.ui.icons.SfIcons
 fun EqualizerScreen(
     contentPadding: PaddingValues = PaddingValues(),
     modifier: Modifier = Modifier,
-    onOpenPresets: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val sessionId by AppSettings.audioSessionId.collectAsStateWithLifecycle()
@@ -52,16 +52,5 @@ fun EqualizerScreen(
             )
         }
         Spacer(Modifier.height(32.dp))
-    }
-}
-
-@Composable
-fun EqualizerPresetPage(
-    onChosen: () -> Unit,
-    contentPadding: PaddingValues = PaddingValues(),
-    modifier: Modifier = Modifier,
-) {
-    LaunchedEffect(Unit) {
-        onChosen()
     }
 }

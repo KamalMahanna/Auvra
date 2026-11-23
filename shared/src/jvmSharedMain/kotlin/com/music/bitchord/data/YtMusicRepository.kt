@@ -3,8 +3,6 @@ package com.music.bitchord.data
 import com.music.bitchord.data.DebugLog as Log
 import com.music.bitchord.data.innertube.Innertube
 import com.music.bitchord.data.innertube.InnertubeParser
-import com.music.bitchord.data.model.Account
-import com.music.bitchord.data.model.AccountChannel
 import com.music.bitchord.data.model.isExactArtistMatch
 import com.music.bitchord.data.model.normalizedArtistName
 import com.music.bitchord.data.model.ArtistPage
@@ -13,15 +11,12 @@ import com.music.bitchord.data.model.HomeFeed
 import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.LibraryPage
 import com.music.bitchord.data.model.LibraryState
-import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.MoodGenreSection
-import com.music.bitchord.data.model.playlistMoves
 import com.music.bitchord.data.model.PlaylistPrivacy
 import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
-import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.UserPlaylist
 import com.music.bitchord.data.model.VersionTimeMap
 import com.music.bitchord.data.model.WatchTarget
@@ -35,7 +30,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /** Suspend API over Innertube. Every call returns a Result so the UI can show a real error. */
@@ -534,32 +528,6 @@ object YtMusicRepository {
         return pair.song
     }
 
-    /** Signed-in profile for the settings header. Null when signed out. */
-    suspend fun account(): Result<Account> = call("account") {
-        InnertubeParser.parseAccount(Innertube.accountMenu())
-            ?: error("No account details")
-    }
-
-    /**
-     * The channels this login can act as — its own, plus any brand channels.
-     *
-     * Two endpoints are asked in turn because either can come back with an
-     * envelope holding no `accountItem` at all, and the two do not fail
-     * together: `accounts_list` is the first-party route and the switcher is
-     * what youtube.com's own avatar menu uses. An empty list from the first is
-     * not an answer, it is a shape this parser didn't recognise, so it is
-     * treated the same as a failure and the other route is tried.
-     */
-    suspend fun accountChannels(): Result<List<AccountChannel>> = call("channels") {
-        val viaInnertube = runCatching {
-            InnertubeParser.parseAccountChannels(Innertube.accountsList())
-        }.onFailure { Log.w(TAG, "accounts_list unavailable: ${it.message}") }
-            .getOrNull()
-            .orEmpty()
-        if (viaInnertube.isNotEmpty()) return@call viaInnertube
-        InnertubeParser.parseAccountChannels(Innertube.accountSwitcher())
-    }
-
     /**
      * The whole library in one shot — requires a signed-in session.
      *
@@ -760,20 +728,6 @@ object YtMusicRepository {
      */
     private val showByToken = ConcurrentHashMap<String, String>()
 
-    /**
-     * Whether [browseId] is a playlist the account made — see
-     * [InnertubeParser.parsePlaylistOwned].
-     *
-     * The same question [browseSongs] answers on the way past, asked on its own
-     * by whatever needs it without a page open: holding a playlist card offers
-     * Rename and Delete, and the card itself cannot say whether either applies.
-     * The rows it fetches are thrown away, which is the price of one request for
-     * a menu that would otherwise have to guess.
-     */
-    suspend fun playlistOwned(browseId: String): Result<Boolean?> = call("owner:$browseId") {
-        InnertubeParser.parsePlaylistOwned(Innertube.browse(browseId))
-    }
-
     /** [show] is the podcast a continuation [response] pages through, if any — see [showByToken]. */
     private fun pageOf(response: JsonObject, show: String? = null): SongPage {
         val library = InnertubeParser.parseLibraryState(response)
@@ -914,25 +868,6 @@ object YtMusicRepository {
     )
 
     // ---- Writes -------------------------------------------------------------
-
-    /**
-     * The account's own state for one track — rating and library membership.
-     *
-     * Deliberately a lookup rather than something cached with the [Song]: a
-     * track reaching the player through the queue has been round-tripped
-     * through a MediaItem, which carries an id and little else, and the
-     * feedback tokens are per-row anyway. Fetched when a menu is opened, which
-     * is the only moment the answer is looked at.
-     */
-    suspend fun songMenu(videoId: String): Result<SongMenu> = call("menu:$videoId") {
-        InnertubeParser.parseSongMenu(Innertube.next(videoId), videoId)
-            ?: error("no menu for $videoId")
-    }
-
-    suspend fun rate(videoId: String, status: LikeStatus): Result<Unit> = Result.success(Unit)
-
-    /** Adds or removes a track from the library; [token] says which. */
-    suspend fun setLibraryStatus(token: String): Result<Unit> = Result.success(Unit)
 
     /**
      * Saves an album or playlist to the library, or removes it. [playlistId] is

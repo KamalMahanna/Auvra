@@ -96,7 +96,7 @@ fun LibraryScreen(
      * their placeholders while the history is read, or nothing at all.
      */
     replay: @Composable () -> Unit,
-    onSignIn: () -> Unit,
+    onSignIn: () -> Unit = {},
     onRetry: () -> Unit,
     refreshing: Boolean,
     onRefresh: () -> Unit,

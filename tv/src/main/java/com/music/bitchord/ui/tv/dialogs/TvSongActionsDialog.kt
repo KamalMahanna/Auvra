@@ -1,24 +1,19 @@
 package com.music.bitchord.ui.tv.dialogs
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Info
@@ -26,28 +21,18 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Timer
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.session.MediaController
 import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.model.BrowseType
 import com.music.bitchord.data.model.LikeStatus
-import com.music.bitchord.data.model.PlaylistPrivacy
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.playback.SleepTimer
@@ -56,16 +41,10 @@ import com.music.bitchord.playback.commitRadioQueue
 import com.music.bitchord.playback.playSongs
 import com.music.bitchord.playback.toMediaItem
 import com.music.bitchord.ui.MainViewModel
-import com.music.bitchord.ui.tv.components.TvActivityIndicator
 import com.music.bitchord.ui.tv.components.TvArtwork
 import com.music.bitchord.ui.tv.components.TvDialog
-import com.music.bitchord.ui.tv.components.TvDialogButton
 import com.music.bitchord.ui.tv.components.TvListRow
-import com.music.bitchord.ui.tv.components.TvSongRow
-import com.music.bitchord.ui.tv.components.TvTextField
 import com.music.bitchord.ui.tv.components.tvInitialFocus
-import com.music.bitchord.ui.tv.theme.TvGlass
-import com.music.bitchord.ui.tv.theme.TvType
 import kotlinx.coroutines.launch
 
 /**
@@ -121,16 +100,8 @@ fun TvSongActionMenuDialog(
     val nerdStats by AppSettings.showNerdStats.collectAsState()
 
     when (sheet) {
-        SongSheet.Playlist -> {
-            TvAddToPlaylistDialog(song = song, viewModel = viewModel, onDismiss = onDismiss)
-            return
-        }
         SongSheet.Sleep -> {
             TvSleepTimerDialog(onDismiss = onDismiss)
-            return
-        }
-        SongSheet.Equalizer -> {
-            TvEqualizerDialog(onDismiss = onDismiss)
             return
         }
         SongSheet.Actions -> Unit
@@ -193,13 +164,6 @@ fun TvSongActionMenuDialog(
                     },
                 )
             }
-            item {
-                TvListRow(
-                    title = "Add to Playlist…",
-                    trailingIcon = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                    onClick = { sheet = SongSheet.Playlist },
-                )
-            }
             if (onOpenAlbum != null) {
                 item {
                     TvListRow(
@@ -226,13 +190,6 @@ fun TvSongActionMenuDialog(
             }
             item {
                 TvListRow(
-                    title = "Equalizer",
-                    trailingIcon = Icons.Rounded.Equalizer,
-                    onClick = { sheet = SongSheet.Equalizer },
-                )
-            }
-            item {
-                TvListRow(
                     title = "Sleep Timer",
                     value = if (sleepDeadline != null || sleepAfterTrack) "On" else "Off",
                     trailingIcon = Icons.Rounded.Timer,
@@ -251,7 +208,7 @@ fun TvSongActionMenuDialog(
     }
 }
 
-private enum class SongSheet { Actions, Playlist, Sleep, Equalizer }
+private enum class SongSheet { Actions, Sleep }
 
 /**
  * A station seeded from [song], as the phone builds one: YouTube's radio for
@@ -272,92 +229,6 @@ private suspend fun MediaController.startStation(song: Song) {
         playSongs(listOf(song) + related, 0)
     }
     commitRadioQueue()
-}
-
-/** Picks one of the account's playlists for the song, or names a new one for it. */
-@Composable
-fun TvAddToPlaylistDialog(
-    song: Song,
-    viewModel: MainViewModel,
-    onDismiss: () -> Unit,
-) {
-    val playlists by viewModel.playlists.collectAsState()
-    val loading by viewModel.playlistsLoading.collectAsState()
-    var creating by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) { if (playlists.isEmpty()) viewModel.loadPlaylists() }
-
-    val done = result
-    when {
-        done != null -> TvDialog(title = done, onDismissRequest = onDismiss) {
-            TvDialogButton(text = "OK", onClick = onDismiss, initialFocus = true)
-        }
-        creating -> TvDialog(
-            title = "New Playlist",
-            message = "It will be private, with this song in it.",
-            onDismissRequest = { creating = false },
-        ) {
-            val create = {
-                if (name.isNotBlank()) {
-                    viewModel.createPlaylist(name.trim(), PlaylistPrivacy.PRIVATE, song)
-                    result = "Added to “${name.trim()}”"
-                }
-            }
-            TvTextField(
-                value = name,
-                onValueChange = { name = it },
-                placeholder = "Playlist Name",
-                capitalization = KeyboardCapitalization.Words,
-                imeAction = ImeAction.Done,
-                onImeAction = create,
-                modifier = Modifier.tvInitialFocus(),
-            )
-            Spacer(modifier = Modifier.size(16.dp))
-            TvDialogButton(text = "Create", enabled = name.isNotBlank(), onClick = create)
-            Spacer(modifier = Modifier.size(6.dp))
-            TvDialogButton(text = "Cancel", onClick = { creating = false })
-        }
-        else -> TvDialog(title = "Add to Playlist", message = song.title, onDismissRequest = onDismiss) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 272.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                item {
-                    TvListRow(
-                        title = "New Playlist…",
-                        trailingIcon = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                        modifier = Modifier.tvInitialFocus(),
-                        onClick = { creating = true },
-                    )
-                }
-                if (loading && playlists.isEmpty()) {
-                    item {
-                        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.Center) {
-                            TvActivityIndicator(size = 21.dp)
-                        }
-                    }
-                }
-                items(playlists, key = { it.playlistId }) { playlist ->
-                    TvListRow(
-                        title = playlist.title,
-                        value = playlist.subtitle.takeIf { it.isNotBlank() },
-                        onClick = {
-                            viewModel.addToPlaylists(listOf(playlist), song) { added, already, _ ->
-                                result = when {
-                                    added > 0 -> "Added to “${playlist.title}”"
-                                    already > 0 -> "Already in “${playlist.title}”"
-                                    else -> "Couldn't add to “${playlist.title}”"
-                                }
-                            }
-                        },
-                    )
-                }
-            }
-        }
-    }
 }
 
 /** Stop playback after a while, or at the end of this song. */

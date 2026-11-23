@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.tv.screens
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,10 +20,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -37,7 +37,6 @@ import com.music.bitchord.ui.tv.components.TvChromePinned
 import com.music.bitchord.ui.tv.components.TvListHeader
 import com.music.bitchord.ui.tv.components.TvListRow
 import com.music.bitchord.ui.tv.dialogs.TvAboutDialog
-import com.music.bitchord.ui.tv.dialogs.TvEqualizerDialog
 import com.music.bitchord.ui.tv.dialogs.TvLyricsSourcesDialog
 import com.music.bitchord.ui.tv.dialogs.TvRefreshRateDialog
 import com.music.bitchord.data.settings.TvPlayerStyle
@@ -49,7 +48,7 @@ import com.music.bitchord.ui.tv.theme.TvDimensions
 import com.music.bitchord.ui.tv.theme.TvGlass
 import com.music.bitchord.ui.tv.theme.TvType
 
-private enum class SettingsSheet { Theme, RefreshRate, Equalizer, LyricsSources, Update, About }
+private enum class SettingsSheet { Theme, RefreshRate, LyricsSources, Update, About }
 
 private const val DefaultBlurb = "Playback, sound and display preferences for BitChord on this TV."
 
@@ -67,13 +66,11 @@ fun TvSettingsScreen(
 ) {
     TvChromePinned()
     val signedIn by viewModel.signedIn.collectAsState()
-    val account by viewModel.account.collectAsState()
 
     val automix by AppSettings.smartFadeEnabled.collectAsState()
     val crossfade by AppSettings.crossfadeSeconds.collectAsState()
     val autoplay by AppSettings.autoplay.collectAsState()
     val skipSilence by AppSettings.skipSilence.collectAsState()
-    val eqEnabled by AppSettings.equalizerEnabled.collectAsState()
     val spatial by TvSettings.spatialAudioEnabled.collectAsState()
     val loudness by AppSettings.loudnessNormalization.collectAsState()
     val usbDac by AppSettings.preferUsbDac.collectAsState()
@@ -174,14 +171,6 @@ fun TvSettingsScreen(
             }
 
             item { TvListHeader("Sound") }
-            item {
-                TvListRow(
-                    title = "Equalizer",
-                    value = onOff(eqEnabled),
-                    onFocused = { blurb = "Shape the sound with presets or seven bands of your own." },
-                    onClick = { sheet = SettingsSheet.Equalizer },
-                )
-            }
             item {
                 TvListRow(
                     title = "Spatial Audio",
@@ -341,7 +330,6 @@ fun TvSettingsScreen(
     when (sheet) {
         SettingsSheet.Theme -> TvThemeDialog(onDismiss = { sheet = null })
         SettingsSheet.RefreshRate -> TvRefreshRateDialog(onDismiss = { sheet = null })
-        SettingsSheet.Equalizer -> TvEqualizerDialog(onDismiss = { sheet = null })
         SettingsSheet.LyricsSources -> TvLyricsSourcesDialog(onDismiss = { sheet = null })
         SettingsSheet.Update -> update?.let { TvUpdateDialog(update = it, onDismiss = { sheet = null }) }
         SettingsSheet.About -> TvAboutDialog(onDismiss = { sheet = null })

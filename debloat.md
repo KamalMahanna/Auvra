@@ -84,10 +84,26 @@ This document tracks all features, subsystems, UI screens, network services, thi
 
 ---
 
-## 6. Wear OS Companion
-- **Removed Wear OS Bundling:**
-  - `WearOsSettings.kt`: Settings screen for pushing watch APK over Bluetooth.
-  - Removed `BundleWearApk` task and `:wearos` project bundling in `app/build.gradle.kts`.
+## 6. Wear OS Companion (Completely Purged)
+- **Deleted WearOS App Module:**
+  - Completely deleted the entire `wearos/` project directory (watch UI, ambient mode, protocol, views, and watch playback service).
+- **Deleted Wear Support in Phone & TV:**
+  - Deleted `app/src/main/java/com/music/bitchord/wear/` package: `WatchInstaller.kt`, `WatchInstallTypes.kt`, `WatchOutputState.kt`, `WearBridge.kt`, and `WearCommandService.kt`.
+  - Deleted `tv/src/main/java/com/music/bitchord/wear/` package (TV no-op stubs).
+  - Deleted Wear capabilities descriptor `app/src/main/res/values/wear.xml` (`android_wear_capabilities`).
+- **Removed Wear Dependencies & Proguard Rules:**
+  - Removed `com.google.android.gms:play-services-wearable:20.0.1` and `androidx.wear:wear-remote-interactions:1.1.0` from `app/build.gradle.kts`.
+  - Removed watch wireless ADB install pipeline dependencies: `com.github.MuntashirAkon:libadb-android:3.1.1`, `org.conscrypt:conscrypt-android:2.5.3`, and `org.bouncycastle:bcpkix-jdk18on:1.85`.
+  - Removed watch protocol source set `../wearos/protocol` from `app/build.gradle.kts`.
+  - Removed ProGuard rules for ADB/Conscrypt (`io.github.muntashirakon.adb`, `org.conscrypt`) in `app/proguard-rules.pro`.
+  - Removed WearCommandService declaration and wear intent filters (`wear://*/bitchord/command` and `wear://*/bitchord/stream`) from `app/src/main/AndroidManifest.xml`.
+  - Removed Wear OS APK artifact upload job from `.github/workflows/android.yml`.
+- **Decoupled Playback & UI Subsystems:**
+  - Removed `WearBridge` lifecycle publishing, remote watch speaker (`watchSpeaker`), streams attachment, and watch session foreground duration extension from `PlaybackService.kt`.
+  - Removed `WearBridge` watch output state, watch volume forwarding, and output routing hooks from `AndroidPlayerHost.kt`.
+  - Removed watch output active check from `DacVolumeHud.kt`.
+  - Cleaned `WatchRow`, watch output collector, and strings (`watch_output`, `watch_output_subtitle`) from `AudioOutputSheet.kt` and `PlayerHost.kt`.
+  - Removed unused `onWearOs` callback parameter from `SettingsSheet.kt`.
 
 ---
 
@@ -129,3 +145,13 @@ This document tracks all features, subsystems, UI screens, network services, thi
 - **Removed Liking Songs to Remote Account:** Disabled remote rating network calls (`Innertube.rate`, `Innertube.ratePlaylist`, `YtMusicRepository.rate`, `YtMusicRepository.setSaved`). Removed background multi-page Liked Music continuation sync (`syncLikedMusic`) from `YtMusicRepository.kt` and `MainViewModel.kt`. Constrained notification favorite button (`canLike`) in `PlaybackService.kt` to local/downloaded files only (`OfflinePlaylists`), removing remote rating dispatch (`toggleFavoriteFromNotification`). Simplified `MainViewModel.likeStatuses` to rely directly on in-session/local state (`LikeState.overrides`).
 ### Language & Localization
 - **App Language Fixed to English:** Enforced application locale to always default to and initialize as English (`"en"`). Removed fallback to host device system locale across the application UI, lyrics translation dialog, and Innertube / YouTube Music API requests (`hl=en`).
+### Codebase Cleanup & Dead Feature Removal
+- **Purged Dead Dislike System:** Completely removed `SongActionsMenu` dislike quick action tile, `onToggleDislike` callback, `MainViewModel.toggleDislike`, `MainActivity.shouldSkipAfterDislike`, `DislikeSkipPolicyTest`, and deleted the unused `BrokenHeart` icon vector (`BrokenHeart.kt`).
+- **Removed Dead Account & Channel Routing Remnants:** Removed unused multi-channel and profile routing state and methods from `MainViewModel` (`loadChannels`, `selectChannel`, `stepProfile`, `_channels`, `_selectedChannelKey`, `_selectedChannelName`, `_activeAccountId`, `_activeProfileId`, `loadAccount`, `signOut`). Removed unused parameters (`signedIn`, `account`, `onSignIn`, `onSignOut`) from `SettingsScreen` (`SettingsSheet.kt`) and `MainActivity.kt`.
+- **Removed Unused Cloud Playlist Ownership System:** Removed `resolvePlaylistOwnership`, `editablePlaylist`, `_playlistOwned`, and `ownershipInFlight` from `MainViewModel` and `MainActivity`, eliminating unnecessary playlist ownership network crawls and checks for removed cloud playlists.
+- **Removed Remote Song Menu State:** Removed `loadSongMenu`, `_songMenu`, `songMenu`, `songMenuJob`, and `forgetFromLibrary` from `MainViewModel`, eliminating unused watch queue menu fetches.
+- **Cleaned Up HomeScreen & Common UI:** Deleted obsolete `ServiceCard` helper and dead branches (`"local:all"`, `"local:cache"`, `"local:webdav"`, `"local:smb"`) from `HomeScreen.kt`. Deleted unused `SignInBanner` composable from `Common.kt` and removed its asset `ic_google_g.xml`. Removed unused `onSignIn` parameter from `HomeScreen.kt` and `LibraryScreen.kt`.
+- **Cleaned Up TV Module:** Deleted obsolete 366-line `TvEqualizerDialog.kt` which targeted removed software equalizer settings. Removed `SettingsSheet.Equalizer` and sound row from `TvSettingsScreen.kt`. Removed `SongSheet.Playlist` and `SongSheet.Equalizer` from `TvSongActionsDialog.kt`, including deleting the 84-line `TvAddToPlaylistDialog` cloud playlist dialog. Removed dead `activeProfileId` and `account` observations from `TvApp.kt` and `TvSettingsScreen.kt`.
+- **Cleaned Up Equalizer Presets Route:** Removed dummy `EqualizerPresetPage` stub from `EqualizerScreen.kt`, removed `onOpenPresets` parameter, and removed `AppRoute.EqualizerPresets` from `AppNavigator.kt` and `MainActivity.kt`.
+- **Cleaned Up Unused Imports:** Removed unused `ConfirmationAlert` and `ChoiceAlert` imports from `MainActivity.kt`, and cleaned over 100 unused imports across `MainActivity.kt`, `PlaybackService.kt`, `MainViewModel.kt`, `SettingsSheet.kt`, `TvSettingsScreen.kt`, and `TvSongActionsDialog.kt`.
+- **Updated Repository & Update Links to Auvra:** Retargeted GitHub repository URLs and in-app release update endpoint in `AppUpdateChecker.kt` (`LATEST_RELEASE_URL`), `BitChordApplication.kt`, `README.md`, and backend/web scripts to `KamalMahanna/Auvra`.
