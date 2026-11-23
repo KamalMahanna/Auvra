@@ -111,7 +111,9 @@ object AppUpdateChecker {
             ?.mapNotNull { asset ->
                 val name = asset["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
                 val url = asset["browser_download_url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                val ours = name.startsWith(BuildConfig.UPDATE_APK_PREFIX, ignoreCase = true) &&
+                val ours = (name.startsWith(BuildConfig.UPDATE_APK_PREFIX, ignoreCase = true) ||
+                    name.startsWith("Auvra-", ignoreCase = true) ||
+                    name.startsWith("BitChord-", ignoreCase = true)) &&
                     name.endsWith(".apk", ignoreCase = true) &&
                     asset["state"]?.jsonPrimitive?.contentOrNull == "uploaded"
                 if (ours) name.removeSuffix(".apk").removeSuffix(".APK") to url else null

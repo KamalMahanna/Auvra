@@ -50,8 +50,11 @@ android {
         // Haze falls back to a translucent scrim below that.
         minSdk = 26
         targetSdk = 36
-        versionCode = rootProject.extra["bitchordVersionCode"] as Int
-        versionName = rootProject.extra["bitchordVersionName"] as String
+        val envVersionCode = System.getenv("APP_VERSION_CODE")?.toIntOrNull()
+        val envVersionName = System.getenv("APP_VERSION_NAME")?.takeIf { it.isNotBlank() }
+
+        versionCode = envVersionCode ?: (rootProject.extra["bitchordVersionCode"] as Int)
+        versionName = envVersionName ?: (rootProject.extra["bitchordVersionName"] as String)
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -61,7 +64,7 @@ android {
             "\"${addonAuthServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
         )
         // Which release assets are this app's. See AppUpdateChecker.apkAssetUrl.
-        buildConfigField("String", "UPDATE_APK_PREFIX", "\"BitChord-\"")
+        buildConfigField("String", "UPDATE_APK_PREFIX", "\"Auvra-\"")
     }
 
     splits {

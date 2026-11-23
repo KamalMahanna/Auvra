@@ -41,8 +41,11 @@ buildscript {
  * No "v" in the name — the in-app updater reads it as a number; the "v" is the
  * release tag's alone.
  */
-extra["bitchordVersionCode"] = 39
-extra["bitchordVersionName"] = "1.9.1"
+val envVersionCode = System.getenv("APP_VERSION_CODE")?.toIntOrNull()
+val envVersionName = System.getenv("APP_VERSION_NAME")?.takeIf { it.isNotBlank() }
+
+extra["bitchordVersionCode"] = envVersionCode ?: 78
+extra["bitchordVersionName"] = envVersionName ?: "26.11.23.78"
 
 /*
  * Bump this by hand before cutting each sideloaded test build ("beta2",
