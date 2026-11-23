@@ -20,19 +20,42 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Setup Secrets (Keystore & local.properties)
+    - name: Setup Signing Keystore
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       run: |
-        echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" > local.properties
-        echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> local.properties
-        echo "LISTEN_TOGETHER_SERVER=${{ secrets.LISTEN_TOGETHER_SERVER }}" >> local.properties
+        if [ -z "$KEYSTORE_BASE64" ]; then
+          echo "::error::KEYSTORE_BASE64 secret is missing or empty! Re-encode keystore and configure GitHub Secrets."
+          exit 1
+        fi
 
-        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > bitchord-release.jks
-        {
-          echo "storeFile=bitchord-release.jks"
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}"
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
-        } > keystore.properties
+        # Strip whitespace, newlines, and carriage returns before decoding
+        echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > bitchord-release.jks
+
+        if [ ! -s bitchord-release.jks ]; then
+          echo "::error::Decoded bitchord-release.jks is 0 bytes. Check KEYSTORE_BASE64 secret."
+          exit 1
+        fi
+
+        # Generate keystore.properties safely using Python to avoid shell escaping issues
+        python3 - << 'EOF'
+        import os
+        with open("keystore.properties", "w") as f:
+            f.write("storeFile=bitchord-release.jks\n")
+            f.write(f"storePassword={os.environ.get('KEYSTORE_PASSWORD', '')}\n")
+            f.write(f"keyAlias={os.environ.get('KEY_ALIAS', '')}\n")
+            f.write(f"keyPassword={os.environ.get('KEY_PASSWORD') or os.environ.get('KEYSTORE_PASSWORD', '')}\n")
+        EOF
+
+        # Fail fast if keystore or credentials cannot be parsed
+        echo "Validating keystore with keytool..."
+        keytool -list -v \
+          -keystore bitchord-release.jks \
+          -storepass "$KEYSTORE_PASSWORD" \
+          -alias "$KEY_ALIAS"
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew

@@ -105,13 +105,22 @@ android {
         // fails the release build outright at validateSigningRelease — which is
         // exactly the failure the unsigned fallback above exists to avoid, so
         // the keystore has to be looked for rather than assumed.
-        val store = signing.getProperty("storeFile")?.let { rootProject.file(it) }
-        if (store != null && store.exists()) {
+        val storeFileProp = signing.getProperty("storeFile")?.takeIf { it.isNotBlank() }
+            ?: System.getenv("KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+        val store = storeFileProp?.let { rootProject.file(it) }
+        val storePass = signing.getProperty("storePassword")?.takeIf { it.isNotBlank() }
+            ?: System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+        val alias = signing.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
+            ?: System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
+        val keyPass = (signing.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
+            ?: System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }) ?: storePass
+
+        if (store != null && store.exists() && store.length() > 0 && !storePass.isNullOrEmpty() && !alias.isNullOrEmpty()) {
             create("release") {
-                storeFile = store
-                storePassword = signing.getProperty("storePassword")
-                keyAlias = signing.getProperty("keyAlias")
-                keyPassword = signing.getProperty("keyPassword")
+                this.storeFile = store
+                this.storePassword = storePass
+                this.keyAlias = alias
+                this.keyPassword = keyPass
             }
         }
     }
