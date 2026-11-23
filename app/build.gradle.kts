@@ -110,10 +110,13 @@ android {
         val store = storeFileProp?.let { rootProject.file(it) }
         val storePass = signing.getProperty("storePassword")?.takeIf { it.isNotBlank() }
             ?: System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+            ?: System.getenv("RELEASE_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
         val alias = signing.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
             ?: System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
+            ?: System.getenv("RELEASE_KEY_ALIAS")?.takeIf { it.isNotBlank() }
         val keyPass = (signing.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
-            ?: System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }) ?: storePass
+            ?: System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+            ?: System.getenv("RELEASE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }) ?: storePass
 
         if (store != null && store.exists() && store.length() > 0 && !storePass.isNullOrEmpty() && !alias.isNullOrEmpty()) {
             create("release") {
